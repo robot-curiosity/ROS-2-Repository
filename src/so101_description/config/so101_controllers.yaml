@@ -1,0 +1,45 @@
+# Controller configuration for the SO-101 arm.
+#
+# Loaded two different ways depending on the backend:
+#   - bringup.launch.py passes this file to a standalone ros2_control_node.
+#   - gazebo.launch.py has it loaded by the gz_ros2_control plugin *inside* the
+#     Gazebo process (referenced from urdf/so101.ros2_control.xacro).
+# Both paths use this same file, so a trajectory that works on mock hardware
+# works unchanged in Gazebo.
+#
+# Joint names must match urdf/so101_arm_macro.xacro (upstream SO-101 names).
+
+controller_manager:
+  ros__parameters:
+    update_rate: 100  # Hz
+
+    joint_state_broadcaster:
+      type: joint_state_broadcaster/JointStateBroadcaster
+
+    arm_controller:
+      type: joint_trajectory_controller/JointTrajectoryController
+
+arm_controller:
+  ros__parameters:
+    # All six joints, gripper included, live in one trajectory controller.
+    # If the gripper later needs independent action-based control, move it out
+    # into its own controller rather than adding a second one over these joints.
+    joints:
+      - shoulder_pan
+      - shoulder_lift
+      - elbow_flex
+      - wrist_flex
+      - wrist_roll
+      - gripper
+
+    command_interfaces:
+      - position
+
+    state_interfaces:
+      - position
+      - velocity
+
+    state_publish_rate: 50.0
+    action_monitor_rate: 20.0
+    # Allows goals that name only a subset of joints (e.g. single-joint tests).
+    allow_partial_joints_goal: true
