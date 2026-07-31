@@ -1,0 +1,373 @@
+<?xml version="1.0"?>
+<robot name="drivebase" xmlns:xacro="http://www.ros.org/wiki/xacro">
+
+  <xacro:include filename="$(find drivebase_description)/urdf/inertia.xacro"/>
+
+  <!-- Adds Gazebo system plugins and simulated sensors. Off by default so the
+       same URDF drives real hardware unchanged. -->
+  <xacro:arg name="use_sim" default="false"/>
+  <xacro:property name="use_sim" value="$(arg use_sim)"/>
+
+  <!-- Mounts the SO-101 on the top plane. Off gives a bare drivebase, which is
+       useful for isolating whether a handling problem is the arm's mass or the
+       base itself. -->
+  <xacro:arg name="use_arm" default="true"/>
+  <xacro:property name="use_arm" value="$(arg use_arm)"/>
+
+  <xacro:if value="${use_arm}">
+    <xacro:include filename="$(find so101_description)/urdf/so101_macro.xacro"/>
+  </xacro:if>
+
+  <!-- Wheel contact friction, exposed so the contact model can be swept. The
+       simulated robot cannot rotate in place reliably - only the first rotation
+       of a run succeeds - and lateral friction is the prime suspect. See
+       docs/localization_accuracy.md. -->
+  <xacro:arg name="wheel_mu1" default="1.0"/>
+  <xacro:arg name="wheel_mu2" default="0.6"/>
+
+  <!-- Draw the ultrasonic cones in the Gazebo GUI. On by default: seeing which
+       cone caught an obstacle is most of the value of running the sim at all. -->
+  <xacro:arg name="show_sensor_rays" default="true"/>
+  <xacro:property name="show_sensor_rays" value="$(arg show_sensor_rays)"/>
+
+  <!-- Arm stow pose, radians. PROVISIONAL - the arm team owns the real one.
+       It matters to navigation, not just aesthetics: at the all-zero pose the
+       gripper reaches ~290 mm past the chassis face, roughly 200 mm outside the
+       robot's footprint circle, so Nav2 would plan paths that clip the arm
+       through obstacles. Stowing it inside the footprint is what lets the
+       footprint stay the chassis.
+
+       Measured in the running simulator via base_link -> arm_gripper_frame_link,
+       not hand-solved: gripper at x=+0.309, z=+0.170 (230 mm above ground). Folded
+       rather than extended, gripper carried clear of the ground, and every joint
+       off its hard limit (lift 69%, elbow 92%, wrist 66%).
+
+       Only ~34 mm past the wheel line, so the Nav2 footprint stays the wheel
+       envelope. Not tucked fully inside the chassis - folding backward from a
+       front-face mount drives the gripper into the body, so up-and-forward is the
+       available direction. -->
+  <xacro:property name="stow_shoulder_pan"  value="0.0"/>
+  <xacro:property name="stow_shoulder_lift" value="-1.20"/>
+  <xacro:property name="stow_elbow_flex"    value="1.55"/>
+  <xacro:property name="stow_wrist_flex"    value="1.10"/>
+  <xacro:property name="stow_wrist_roll"    value="0.0"/>
+  <xacro:property name="stow_gripper"       value="0.0"/>
+
+  <!-- ==================================================================
+       GEOMETRY
+       Every dimension the rest of the file depends on lives here. When the
+       printed chassis is measured for real, edit these and nothing else.
+       ================================================================== -->
+
+  <!-- Drive geometry. Measured values from the mechanical design. -->
+  <xacro:property name="wheel_radius"    value="0.060"/>   <!-- 120 mm dia -->
+  <xacro:property name="wheel_width"     value="0.040"/>   <!-- ESTIMATE -->
+  <xacro:property name="track"           value="0.430"/>   <!-- left<->right -->
+  <!-- Square wheel layout. Puts the front axle at x=+215, well ahead of the arm
+       mount at x=+115, so the arm loads the wheelbase instead of cantilevering
+       past it. Side effect: the wheels now protrude ~100 mm beyond the chassis
+       front face - see the ultrasonic placement note below. -->
+  <xacro:property name="wheelbase"       value="0.430"/>   <!-- front<->rear -->
+
+  <!-- Chassis body. Footprint is measured; height is still an ESTIMATE carried
+       over from "cube chassis". -->
+  <xacro:property name="chassis_length"  value="0.430"/>
+  <xacro:property name="chassis_width"   value="0.430"/>
+  <xacro:property name="chassis_height"  value="0.430"/>
+  <xacro:property name="ground_clearance" value="0.030"/>
+
+  <!-- Masses. ESTIMATES. Only matter for simulation dynamics. -->
+  <xacro:property name="chassis_mass"    value="8.0"/>
+  <xacro:property name="wheel_mass"      value="0.4"/>
+
+  <!-- Derived. Don't edit these directly. -->
+  <xacro:property name="chassis_z"
+                  value="${ground_clearance + chassis_height/2 - wheel_radius}"/>
+  <xacro:property name="top_plane_z"
+                  value="${ground_clearance + chassis_height - wheel_radius}"/>
+  <xacro:property name="front_face_x" value="${chassis_length/2}"/>
+
+  <material name="chassis_grey">
+    <color rgba="0.30 0.32 0.35 1.0"/>
+  </material>
+  <material name="wheel_black">
+    <color rgba="0.10 0.10 0.10 1.0"/>
+  </material>
+  <material name="sensor_orange">
+    <color rgba="0.90 0.45 0.10 1.0"/>
+  </material>
+
+  <!-- ==================================================================
+       CHASSIS
+       base_footprint sits on the ground directly below base_link. Nav2 and
+       the EKF both expect this pair; the footprint frame is what gets
+       localized in the map, base_link is the physical body origin.
+       ================================================================== -->
+
+  <link name="base_footprint"/>
+
+  <joint name="base_footprint_to_base_link" type="fixed">
+    <parent link="base_footprint"/>
+    <child  link="base_link"/>
+    <!-- base_link rides at axle height so wheel joints sit at z=0 -->
+    <origin xyz="0 0 ${wheel_radius}" rpy="0 0 0"/>
+  </joint>
+
+  <link name="base_link">
+    <visual>
+      <origin xyz="0 0 ${chassis_z}" rpy="0 0 0"/>
+      <geometry>
+        <box size="${chassis_length} ${chassis_width} ${chassis_height}"/>
+      </geometry>
+      <material name="chassis_grey"/>
+    </visual>
+    <collision>
+      <origin xyz="0 0 ${chassis_z}" rpy="0 0 0"/>
+      <geometry>
+        <box size="${chassis_length} ${chassis_width} ${chassis_height}"/>
+      </geometry>
+    </collision>
+    <xacro:box_inertia mass="${chassis_mass}"
+                       x="${chassis_length}"
+                       y="${chassis_width}"
+                       z="${chassis_height}"/>
+  </link>
+
+  <!-- ==================================================================
+       WHEELS
+       Four driven wheels, skid steer. Modelled as continuous joints even
+       though nothing commands them directly on hardware — Gazebo needs
+       real joints, and robot_state_publisher needs them to build /tf.
+       ================================================================== -->
+
+  <xacro:macro name="wheel" params="name x_sign y_sign">
+    <link name="${name}_wheel_link">
+      <visual>
+        <origin xyz="0 0 0" rpy="${pi/2} 0 0"/>
+        <geometry>
+          <cylinder radius="${wheel_radius}" length="${wheel_width}"/>
+        </geometry>
+        <material name="wheel_black"/>
+      </visual>
+      <collision>
+        <origin xyz="0 0 0" rpy="${pi/2} 0 0"/>
+        <geometry>
+          <cylinder radius="${wheel_radius}" length="${wheel_width}"/>
+        </geometry>
+      </collision>
+      <xacro:cylinder_inertia mass="${wheel_mass}"
+                              radius="${wheel_radius}"
+                              length="${wheel_width}"/>
+    </link>
+
+    <joint name="${name}_wheel_joint" type="continuous">
+      <parent link="base_link"/>
+      <child  link="${name}_wheel_link"/>
+      <origin xyz="${x_sign * wheelbase/2} ${y_sign * track/2} 0" rpy="0 0 0"/>
+      <axis xyz="0 1 0"/>
+    </joint>
+  </xacro:macro>
+
+  <xacro:wheel name="front_left"  x_sign="1"  y_sign="1"/>
+  <xacro:wheel name="front_right" x_sign="1"  y_sign="-1"/>
+  <xacro:wheel name="rear_left"   x_sign="-1" y_sign="1"/>
+  <xacro:wheel name="rear_right"  x_sign="-1" y_sign="-1"/>
+
+  <!-- ==================================================================
+       SENSORS
+       Frame placement here is load-bearing: the EKF fuses IMU and GPS in
+       these frames, and the costmap projects range readings from them.
+       A wrong offset shows up as drift, not as an obvious error.
+       ================================================================== -->
+
+  <!-- IMU. Mounted as close to the center of rotation as the build allows;
+       lever-arm offset from the rotation center injects false acceleration
+       during turns, which the EKF reads as real motion. -->
+  <link name="imu_link">
+    <xacro:sensor_inertia/>
+  </link>
+  <joint name="imu_joint" type="fixed">
+    <parent link="base_link"/>
+    <child  link="imu_link"/>
+    <origin xyz="0 0 ${chassis_z}" rpy="0 0 0"/>
+  </joint>
+
+  <!-- GPS. Rear of the top plane, on a short mast, deliberately away from
+       the arm so the arm body doesn't shadow satellites during pickup. -->
+  <link name="gps_link">
+    <xacro:sensor_inertia/>
+  </link>
+  <joint name="gps_joint" type="fixed">
+    <parent link="base_link"/>
+    <child  link="gps_link"/>
+    <origin xyz="-0.120 0 ${top_plane_z + 0.050}" rpy="0 0 0"/>
+  </joint>
+
+  <!-- Camera. Front face, above the ultrasonic band, below the arm base.
+       The optical frame follows the ROS convention (z forward, x right,
+       y down) that image pipelines and depth projection assume. -->
+  <link name="camera_link">
+    <xacro:sensor_inertia/>
+  </link>
+  <joint name="camera_joint" type="fixed">
+    <parent link="base_link"/>
+    <child  link="camera_link"/>
+    <origin xyz="${front_face_x} 0 0.250" rpy="0 0 0"/>
+  </joint>
+
+  <link name="camera_optical_frame"/>
+  <joint name="camera_optical_joint" type="fixed">
+    <parent link="camera_link"/>
+    <child  link="camera_optical_frame"/>
+    <origin xyz="0 0 0" rpy="${-pi/2} 0 ${-pi/2}"/>
+  </joint>
+
+  <!-- Arm mount. Bolted to the front face with the base plate horizontal, so the
+       arm stands up from it and reaches forward and down.
+
+       HEIGHT IS LOAD-BEARING, not cosmetic. Measured in simulation: the SO-101
+       reaches 219 mm below its own mount (gripper 241 mm above ground when
+       mounted at 460 mm, elbow and wrist extended). Litter on the ground needs
+       the gripper near 30-40 mm, so the mount has to sit around 250-260 mm.
+       260 mm also clears the ultrasonic band at 200 mm by 17 mm once the base
+       link's own 87 mm height is accounted for.
+
+       On the top plane (460 mm) the arm could not reach the ground at all. -->
+  <xacro:property name="arm_mount_z" value="0.200"/>  <!-- 260 mm above ground -->
+
+  <link name="arm_mount_link">
+    <xacro:sensor_inertia/>
+  </link>
+  <joint name="arm_mount_joint" type="fixed">
+    <parent link="base_link"/>
+    <child  link="arm_mount_link"/>
+    <!-- On the face, not bracketed ahead of it: the base plate then protrudes
+         ~55 mm, less than the wheels' 60 mm, so the Nav2 footprint stays the
+         wheel envelope instead of growing to include the arm. -->
+    <origin xyz="${front_face_x} 0 ${arm_mount_z}" rpy="0 0 0"/>
+  </joint>
+
+  <!-- Ultrasonic band. Five sensors across the front face, fanned to cover
+       the drive corridor. Mounted low so the arm and its payload stay out
+       of the cones. -->
+  <!-- 0.14 above base_link = 200 mm above ground, clearing the 120 mm wheel tops
+       by 80 mm. At 0.05 the outer cones looked straight into the front wheels and
+       reported a permanent 0.08-0.09 m obstacle (measured, before this change) -
+       the square wheelbase puts the front wheels 60 mm ahead of the chassis face,
+       so anything at hub height sees them. Raising the band clears the wheels
+       geometrically and keeps the full +-50 deg fan; narrowing the fan instead
+       would have cost real coverage. -->
+  <xacro:property name="us_z" value="0.140"/>
+
+  <xacro:macro name="ultrasonic" params="name y yaw_deg">
+    <link name="ultrasonic_${name}_link">
+      <visual>
+        <geometry><box size="0.010 0.045 0.020"/></geometry>
+        <material name="sensor_orange"/>
+      </visual>
+      <xacro:sensor_inertia/>
+    </link>
+    <joint name="ultrasonic_${name}_joint" type="fixed">
+      <parent link="base_link"/>
+      <child  link="ultrasonic_${name}_link"/>
+      <origin xyz="${front_face_x} ${y} ${us_z}"
+              rpy="0 0 ${radians(yaw_deg)}"/>
+    </joint>
+  </xacro:macro>
+
+  <xacro:ultrasonic name="front_left"    y="0.120"  yaw_deg="50"/>
+  <xacro:ultrasonic name="front_midleft" y="0.060"  yaw_deg="25"/>
+  <xacro:ultrasonic name="front_center"  y="0.000"  yaw_deg="0"/>
+  <xacro:ultrasonic name="front_midright" y="-0.060" yaw_deg="-25"/>
+  <xacro:ultrasonic name="front_right"   y="-0.120" yaw_deg="-50"/>
+
+  <!-- ==================================================================
+       ARM
+       SO-101 on the top plane, its own base frame already Z-up so the mount
+       transform is identity.
+       ================================================================== -->
+  <xacro:if value="${use_arm}">
+    <xacro:so101 prefix="arm_" parent="arm_mount_link">
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+    </xacro:so101>
+
+    <!-- Sensor pod: camera + ToF, eye-in-hand.
+
+         Mounted on arm_wrist_link, which is BEFORE wrist_roll in the chain. The
+         camera therefore never rolls, so the image up-vector is fixed and the
+         harness crosses four moving joints rather than five. See
+         docs/superpowers/specs/2026-07-30-behaviour-coordinator-design.md §4.
+
+         CO-LOCATION IS LOAD-BEARING. A 20 mm camera-to-ToF separation at 80 mm
+         range is a large angular disagreement - the ToF can be reading past the
+         target while the camera reports it centred. These offsets are a
+         placeholder until the physical pod exists; they must be remeasured, and
+         must never be assumed zero. -->
+    <xacro:property name="pod_camera_xyz" value="0.010 0.0 0.030"/>
+    <xacro:property name="pod_tof_xyz"    value="0.010 0.0 0.015"/>
+
+    <!-- DO NOT ROTATE THIS TO POINT AT THE GRIPPER. It was tried, twice, and
+         both attempts blinded the sensor outright. Keeping zero is a measured
+         result, not the absence of one.
+
+         arm_wrist_link's +X genuinely does not point at the gripper: the SO-101
+         puts arm_gripper_frame_link at (0.00790, -0.15923, 0.01832) here,
+         essentially along -Y, 87.2 degrees off +X. Aiming the pod along that
+         approach axis looks like the obvious correction. It is not, because the
+         gripper body itself runs from this link out to the jaws, so that line of
+         sight is straight down it:
+
+           rpy 0 -0.1145 -1.5213, offsets as above ....... 0.058 m at 31 poses
+           rpy 0  0.0402 -1.6374, offsets 0.030/0.040 .... 0.089 m at 44 poses
+
+         Both figures are constant to +-3 mm across poses whose geometry differs
+         completely, and both persist at poses whose ray points at open sky,
+         where an unobstructed beam must return the sensor's 4.000 m max. That is
+         the robot's own castings, at every arm pose, every wrist_roll from -2.5
+         to +2.5 rad, and both gripper openings.
+
+         At rpy 0 0 0 the beam clears the castings by 69.5 degrees and the sky
+         check returns exactly 4.000 m. See docs/arm_workspace.md §3 for the
+         search and confirm poses this supports, and scripts/pod_aim_search.py
+         for the sweep over every mounting orientation.
+
+         Shared by both pod joints so they cannot drift apart: the camera's view
+         axis and the ToF ray agree to 4 decimal places at every pose measured,
+         and the localisation maths assumes exactly that. -->
+    <xacro:property name="pod_aim_rpy" value="0 0 0"/>
+
+    <link name="pod_camera_link">
+      <xacro:sensor_inertia/>
+    </link>
+    <joint name="pod_camera_joint" type="fixed">
+      <parent link="arm_wrist_link"/>
+      <child  link="pod_camera_link"/>
+      <origin xyz="${pod_camera_xyz}" rpy="${pod_aim_rpy}"/>
+    </joint>
+
+    <!-- ROS optical convention: z forward, x right, y down. Image pipelines and
+         the ray projection in drivebase_behaviour/localisation.py both assume
+         it. Same rotation the chassis camera_optical_joint uses. -->
+    <link name="pod_camera_optical_frame"/>
+    <joint name="pod_camera_optical_joint" type="fixed">
+      <parent link="pod_camera_link"/>
+      <child  link="pod_camera_optical_frame"/>
+      <origin xyz="0 0 0" rpy="${-pi/2} 0 ${-pi/2}"/>
+    </joint>
+
+    <link name="pod_tof_link">
+      <xacro:sensor_inertia/>
+    </link>
+    <joint name="pod_tof_joint" type="fixed">
+      <parent link="arm_wrist_link"/>
+      <child  link="pod_tof_link"/>
+      <origin xyz="${pod_tof_xyz}" rpy="${pod_aim_rpy}"/>
+    </joint>
+  </xacro:if>
+
+  <!-- Included last: gazebo.xacro reads the geometry properties above. -->
+  <xacro:if value="${use_sim}">
+    <xacro:include filename="$(find drivebase_description)/urdf/gazebo.xacro"/>
+  </xacro:if>
+
+</robot>

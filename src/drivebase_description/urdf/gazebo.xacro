@@ -1,0 +1,362 @@
+<?xml version="1.0"?>
+<!--
+  Gazebo Harmonic (gz-sim 8) additions. Included from drivebase.urdf.xacro only
+  when use_sim:=true, so one URDF serves both hardware and simulation.
+
+  Reads geometry properties (track, wheel_radius, ...) from the parent scope.
+
+  NOTE ON SYSTEM PLUGINS: gz-sim-sensors-system, -imu-system, and -navsat-system
+  are WORLD-level plugins, not model-level. They live in drivebase_sim's world
+  file. Only DiffDrive and JointStatePublisher belong here.
+-->
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro">
+
+  <!-- Gazebo-side topic prefix. Must match ENTITY_NAME in drivebase_sim's
+       sim.launch.py and the gz_topic_name values in config/bridge.yaml. These
+       three places are coupled; changing one without the others produces a
+       simulation that runs silently and publishes nothing. Set explicitly
+       rather than relying on gz defaults, which differ per plugin. -->
+  <xacro:property name="gz_prefix" value="/model/drivebase"/>
+
+  <!-- ==================================================================
+       DRIVE
+       ================================================================== -->
+  <gazebo>
+    <plugin filename="gz-sim-diff-drive-system"
+            name="gz::sim::systems::DiffDrive">
+      <left_joint>front_left_wheel_joint</left_joint>
+      <left_joint>rear_left_wheel_joint</left_joint>
+      <right_joint>front_right_wheel_joint</right_joint>
+      <right_joint>rear_right_wheel_joint</right_joint>
+
+      <!-- Physics simulates actual scrub through the wheel friction model, but
+           the odometry DiffDrive publishes is computed from ideal two-wheel
+           kinematics, yaw_rate = (v_r - v_l) / wheel_separation. So published
+           odom over-reports rotation relative to the true simulated pose.
+
+           That bias is a feature, not a bug: real skid-steer wheel odometry has
+           the same bias in the same direction, which is exactly why the EKF must
+           take yaw from the IMU rather than the wheels. Compensating it means
+           using an effective track wider than the physical one. MEASURED in
+           simulation over 6 clean turns: 1.742x (stdev 0.025), i.e. an effective
+           wheel_separation of 0.749 m. See docs/localization_accuracy.md.
+
+           Left at the physical track deliberately: the simulation should carry
+           the same bias the real robot has, which is what forces the EKF to take
+           yaw from the IMU rather than the wheels. Correcting it here would hide
+           the very effect the EKF exists to handle. -->
+      <wheel_separation>${track}</wheel_separation>
+      <wheel_radius>${wheel_radius}</wheel_radius>
+
+      <topic>${gz_prefix}/cmd_vel</topic>
+      <odom_topic>${gz_prefix}/odom</odom_topic>
+      <frame_id>odom</frame_id>
+      <child_frame_id>base_footprint</child_frame_id>
+      <odom_publish_frequency>50</odom_publish_frequency>
+
+      <!-- Parked on a topic nothing bridges. DiffDrive always publishes a
+           transform; robot_localization must be the only publisher of
+           odom -> base_footprint, and two sources fighting over one transform
+           produces localization that is subtly and inconsistently wrong. -->
+      <tf_topic>${gz_prefix}/unused_tf</tf_topic>
+
+      <max_linear_acceleration>1.5</max_linear_acceleration>
+    </plugin>
+
+    <!-- GROUND TRUTH, for measuring the estimators against. Reads the model's
+         true world pose (WorldPoseTag), so it is not a simulated sensor and
+         carries no error - gaussian_noise is deliberately left unset.
+
+         Chosen over bridging /world/.../dynamic_pose/info: that arrives as a
+         Pose_V, and the bridge's TFMessage conversion leaves child_frame_id
+         EMPTY (measured), so there is no way to tell which entity is the robot.
+
+         tf_topic is parked unbridged for the same reason as DiffDrive's - ground
+         truth must never reach /tf, or it would displace the estimate being
+         measured. -->
+    <plugin filename="gz-sim-odometry-publisher-system"
+            name="gz::sim::systems::OdometryPublisher">
+      <odom_topic>${gz_prefix}/ground_truth</odom_topic>
+      <odom_frame>truth_origin</odom_frame>
+      <robot_base_frame>base_footprint</robot_base_frame>
+      <odom_publish_frequency>50</odom_publish_frequency>
+      <dimensions>2</dimensions>
+      <tf_topic>${gz_prefix}/unused_truth_tf</tf_topic>
+    </plugin>
+
+    <plugin filename="gz-sim-joint-state-publisher-system"
+            name="gz::sim::systems::JointStatePublisher">
+      <topic>${gz_prefix}/joint_state</topic>
+      <!-- No <joint_name> entries: publishes every joint, so the arm's six come
+           along automatically and robot_state_publisher can build arm tf.
+
+           KNOWN WART: this publishes every physics step (~1 kHz) and gz's
+           JointStatePublisher has no rate limit - <update_rate> here is silently
+           ignored (measured: still 980 Hz with it set). Tolerated because it is
+           sim-only. On hardware the Pico publishes wheel state and the Feetech
+           bus publishes arm state, both at sane rates. -->
+    </plugin>
+  </gazebo>
+
+  <!-- ==================================================================
+       ARM JOINT HOLD
+       Without a controller the arm joints are free and the arm collapses under
+       gravity on the first step, which also shifts the base's centre of mass and
+       corrupts any handling measurement. Real STS3215 servos hold position, so
+       modelling them as position-controlled is both more correct and more stable.
+       This is what the ~11 W idle arm draw in docs/power_budget.md pays for.
+       ================================================================== -->
+  <xacro:if value="${use_arm}">
+    <xacro:macro name="arm_joint_hold" params="joint target:=0">
+      <gazebo>
+        <plugin filename="gz-sim-joint-position-controller-system"
+                name="gz::sim::systems::JointPositionController">
+          <joint_name>arm_${joint}</joint_name>
+          <topic>/arm/${joint}/position</topic>
+          <initial_position>${target}</initial_position>
+          <p_gain>4.0</p_gain>
+          <i_gain>0.05</i_gain>
+          <d_gain>0.15</d_gain>
+          <i_max>1.0</i_max>
+          <i_min>-1.0</i_min>
+          <cmd_max>10.0</cmd_max>
+          <cmd_min>-10.0</cmd_min>
+        </plugin>
+      </gazebo>
+    </xacro:macro>
+
+    <!-- Targets come from the stow_* properties in drivebase.urdf.xacro. Command
+         any joint at runtime with
+         `ros2 topic pub /arm/<joint>/position std_msgs/msg/Float64 ...`.
+
+         Float64, NOT Double. These are gz transport topics carrying
+         gz.msgs.Double, and drivebase_sim's bridge.yaml maps them to
+         std_msgs/Float64 - there is no std_msgs/msg/Double, so the obvious
+         guess names a type that does not exist and the command silently does
+         nothing. -->
+    <xacro:arm_joint_hold joint="shoulder_pan"  target="${stow_shoulder_pan}"/>
+    <xacro:arm_joint_hold joint="shoulder_lift" target="${stow_shoulder_lift}"/>
+    <xacro:arm_joint_hold joint="elbow_flex"    target="${stow_elbow_flex}"/>
+    <xacro:arm_joint_hold joint="wrist_flex"    target="${stow_wrist_flex}"/>
+    <xacro:arm_joint_hold joint="wrist_roll"    target="${stow_wrist_roll}"/>
+    <xacro:arm_joint_hold joint="gripper"       target="${stow_gripper}"/>
+
+    <!-- ==================================================================
+         SENSOR POD
+         Eye-in-hand camera and ToF. Both need gz-sim-sensors-system, which is a
+         WORLD plugin and already declared in drivebase_sim's test_field.sdf - a
+         sensor with no matching world system stays silent with no error.
+         ================================================================== -->
+    <gazebo reference="pod_camera_link">
+      <sensor name="pod_camera" type="camera">
+        <always_on>1</always_on>
+        <!-- 15 Hz, not 30. The detector is the bottleneck on hardware and a
+             faster camera would only queue frames the Pi cannot process. -->
+        <update_rate>15</update_rate>
+        <topic>/pod_camera/image</topic>
+        <gz_frame_id>pod_camera_optical_frame</gz_frame_id>
+        <camera>
+          <!-- 1.15 rad ~ 66 deg horizontal. Matches a Pi Camera v3 class part;
+               keep this in step with whatever is actually bought, so the
+               intrinsics the coordinator reads from camera_info transfer. -->
+          <horizontal_fov>1.15</horizontal_fov>
+          <image>
+            <width>640</width>
+            <height>480</height>
+            <format>R8G8B8</format>
+          </image>
+          <clip>
+            <near>0.02</near>
+            <far>10.0</far>
+          </clip>
+        </camera>
+      </sensor>
+    </gazebo>
+
+    <!-- ToF simulated exactly as the ultrasonics are: Gazebo Harmonic has no
+         time-of-flight sensor type, so it is a gpu_lidar with a single ray.
+         laserscan_to_range collapses it to sensor_msgs/Range, which is what a
+         real VL53-class driver publishes directly.
+
+         ONE sample, not five: a ToF returns a single distance along its axis,
+         unlike a sonar which reports the nearest echo anywhere in a cone. -->
+    <gazebo reference="pod_tof_link">
+      <sensor name="pod_tof" type="gpu_lidar">
+        <always_on>1</always_on>
+        <update_rate>20</update_rate>
+        <visualize>${show_sensor_rays}</visualize>
+        <topic>/tof/pod/scan</topic>
+        <gz_frame_id>pod_tof_link</gz_frame_id>
+        <lidar>
+          <scan>
+            <horizontal>
+              <samples>1</samples>
+              <resolution>1</resolution>
+              <min_angle>0.0</min_angle>
+              <max_angle>0.0</max_angle>
+            </horizontal>
+            <vertical>
+              <samples>1</samples>
+              <resolution>1</resolution>
+              <min_angle>0.0</min_angle>
+              <max_angle>0.0</max_angle>
+            </vertical>
+          </scan>
+          <!-- VL53L1X-class limits. min 0.04 m is why the grasp descent must be
+               open-loop: at grab range the target is inside this. -->
+          <range>
+            <min>0.04</min>
+            <max>4.0</max>
+            <resolution>0.001</resolution>
+          </range>
+          <noise type="gaussian"><mean>0.0</mean><stddev>0.005</stddev></noise>
+        </lidar>
+      </sensor>
+    </gazebo>
+  </xacro:if>
+
+  <!-- ==================================================================
+       WHEEL CONTACT
+       Anisotropic friction: high along the rolling direction, lower laterally
+       so the wheels can actually scrub during a turn. Isotropic high friction
+       makes a skid-steer base refuse to rotate; isotropic low friction makes it
+       slide like ice. These values are a starting point to tune against
+       measured hardware.
+       ================================================================== -->
+  <xacro:property name="wheel_mu1" value="$(arg wheel_mu1)"/>
+  <xacro:property name="wheel_mu2" value="$(arg wheel_mu2)"/>
+
+  <xacro:macro name="wheel_surface" params="link">
+    <gazebo reference="${link}">
+      <mu1>${wheel_mu1}</mu1>
+      <mu2>${wheel_mu2}</mu2>
+    </gazebo>
+  </xacro:macro>
+
+  <xacro:wheel_surface link="front_left_wheel_link"/>
+  <xacro:wheel_surface link="front_right_wheel_link"/>
+  <xacro:wheel_surface link="rear_left_wheel_link"/>
+  <xacro:wheel_surface link="rear_right_wheel_link"/>
+
+  <!-- ==================================================================
+       IMU
+       Noise set for a consumer MEMS part (BNO055 / ICM-20948 class). Note the
+       sim IMU reports absolute orientation, which a bare 6-DOF MPU6050 cannot
+       do - so anything tuned against this sim assumes the 9-DOF part.
+       ================================================================== -->
+  <gazebo reference="imu_link">
+    <sensor name="imu_sensor" type="imu">
+      <always_on>1</always_on>
+      <update_rate>100</update_rate>
+      <topic>/imu/data</topic>
+      <gz_frame_id>imu_link</gz_frame_id>
+      <imu>
+        <angular_velocity>
+          <x><noise type="gaussian"><mean>0.0</mean><stddev>0.002</stddev></noise></x>
+          <y><noise type="gaussian"><mean>0.0</mean><stddev>0.002</stddev></noise></y>
+          <z><noise type="gaussian"><mean>0.0</mean><stddev>0.002</stddev></noise></z>
+        </angular_velocity>
+        <linear_acceleration>
+          <x><noise type="gaussian"><mean>0.0</mean><stddev>0.02</stddev></noise></x>
+          <y><noise type="gaussian"><mean>0.0</mean><stddev>0.02</stddev></noise></y>
+          <z><noise type="gaussian"><mean>0.0</mean><stddev>0.02</stddev></noise></z>
+        </linear_acceleration>
+      </imu>
+    </sensor>
+  </gazebo>
+
+  <!-- ==================================================================
+       GPS
+       Models NEO-6M accuracy: ~2.5 m horizontal CEP, ~5 m vertical. Deliberately
+       not optimistic - the EKF has to be tuned against this much noise, and a sim
+       with a perfect GPS teaches you nothing about the real failure mode.
+
+       UNIT TRAP, measured the hard way. gz applies these two noise values in
+       DIFFERENT units:
+         horizontal -> DEGREES of latitude/longitude
+         vertical   -> METRES
+       Setting horizontal to 2.5 (intending metres) scattered fixes across ~7
+       degrees of latitude, about 800 km, and navsat_transform responded by
+       re-deriving its datum on nearly every fix.
+
+       So horizontal is converted here: 1 deg latitude ~ 111320 m, therefore
+       2.5 m ~ 2.25e-5 deg. That approximation is fine for latitude and slightly
+       pessimistic for longitude (a degree of longitude is shorter away from the
+       equator), which errs in the safe direction.
+       ================================================================== -->
+  <gazebo reference="gps_link">
+    <sensor name="navsat_sensor" type="navsat">
+      <always_on>1</always_on>
+      <update_rate>5</update_rate>
+      <topic>/gps/fix</topic>
+      <gz_frame_id>gps_link</gz_frame_id>
+      <navsat>
+        <position_sensing>
+          <horizontal>
+            <!-- degrees: 2.5 m / 111320 m-per-deg -->
+            <noise type="gaussian"><mean>0.0</mean><stddev>0.0000225</stddev></noise>
+          </horizontal>
+          <vertical>
+            <!-- metres -->
+            <noise type="gaussian"><mean>0.0</mean><stddev>5.0</stddev></noise>
+          </vertical>
+        </position_sensing>
+      </navsat>
+    </sensor>
+  </gazebo>
+
+  <!-- ==================================================================
+       ULTRASONICS
+       Gazebo Harmonic has no sonar sensor type, so each HC-SR04 is a narrow
+       gpu_lidar. 5 samples span the ~15 deg cone; laserscan_to_range takes the
+       minimum, which is what a real sonar reports (nearest echo in the cone).
+
+       3 Hz, not per-sensor max rate: real HC-SR04s cross-talk, so they must
+       fire sequentially - 5 sensors x ~60 ms settle is about 3 Hz for a full
+       sweep. Simulating them faster would hide a real constraint.
+       ================================================================== -->
+  <xacro:property name="us_half_fov" value="0.131"/>  <!-- ~15 deg cone -->
+
+  <xacro:macro name="ultrasonic_sensor" params="name">
+    <gazebo reference="ultrasonic_${name}_link">
+      <sensor name="ultrasonic_${name}" type="gpu_lidar">
+        <always_on>1</always_on>
+        <update_rate>3</update_rate>
+        <!-- Draws the cones as visible rays in the Gazebo GUI, so you can watch
+             them hit and clear obstacles. Costs nothing headless. -->
+        <visualize>${show_sensor_rays}</visualize>
+        <topic>/ultrasonic/${name}/scan</topic>
+        <gz_frame_id>ultrasonic_${name}_link</gz_frame_id>
+        <lidar>
+          <scan>
+            <horizontal>
+              <samples>5</samples>
+              <resolution>1</resolution>
+              <min_angle>${-us_half_fov}</min_angle>
+              <max_angle>${us_half_fov}</max_angle>
+            </horizontal>
+            <vertical>
+              <samples>1</samples>
+              <resolution>1</resolution>
+              <min_angle>0.0</min_angle>
+              <max_angle>0.0</max_angle>
+            </vertical>
+          </scan>
+          <range>
+            <min>0.02</min>
+            <max>4.0</max>
+            <resolution>0.01</resolution>
+          </range>
+          <noise type="gaussian"><mean>0.0</mean><stddev>0.01</stddev></noise>
+        </lidar>
+      </sensor>
+    </gazebo>
+  </xacro:macro>
+
+  <xacro:ultrasonic_sensor name="front_left"/>
+  <xacro:ultrasonic_sensor name="front_midleft"/>
+  <xacro:ultrasonic_sensor name="front_center"/>
+  <xacro:ultrasonic_sensor name="front_midright"/>
+  <xacro:ultrasonic_sensor name="front_right"/>
+
+</robot>
