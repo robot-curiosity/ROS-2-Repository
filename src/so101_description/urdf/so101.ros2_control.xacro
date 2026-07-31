@@ -2,20 +2,32 @@
 <!--
   ros2_control configuration for the SO-101 arm.
 
-  Two simulation backends, selected by the use_gazebo param:
+  Ported from Christopher's URDF-arm branch and adapted to this workspace's
+  conventions. The substantive change is `prefix`: our so101 macro namespaces
+  every link and joint (drivebase.urdf.xacro instantiates it as prefix="arm_"),
+  so the ros2_control joint names have to carry the same prefix or the
+  controller binds to nothing and reports no error.
+
+  Two simulation backends, selected by use_gazebo:
     - false (default): mock_components/GenericSystem — loopback hardware,
-      commanded positions are mirrored back as states (no physics).
-    - true: gz_ros2_control/GzSystem — physics simulation in Gazebo Sim
-      (Harmonic, the Jazzy pairing); also emits the <gazebo> plugin tag that
-      runs the controller_manager inside the Gazebo process.
+      commanded positions mirrored back as states, no physics.
+    - true: gz_ros2_control/GazeboSimSystem — physics in Gazebo Sim (Harmonic,
+      the Jazzy pairing). Also emits the <gazebo> plugin tag that runs
+      controller_manager inside the Gazebo process.
+
   A real Feetech STS3215 hardware interface can be added later as a third
   <hardware> alternative.
 
-  Joint names and limits match urdf/so101_arm_macro.xacro (upstream values).
+  Joint names and limits come from urdf/so101_macro.xacro, which is GENERATED
+  by scripts/vendor_so101.py — if the upstream import changes a joint name,
+  this file and config/so101_controllers.yaml both have to follow.
 -->
 <robot xmlns:xacro="http://www.ros.org/wiki/xacro">
 
-  <xacro:macro name="so101_ros2_control" params="name use_gazebo:=false">
+  <!-- `prefix` must match the prefix passed to the so101 macro, and the joint
+       names in config/so101_controllers.yaml. Default "arm_" matches the
+       drivebase; see that file's header for why there is only one config. -->
+  <xacro:macro name="so101_ros2_control" params="name prefix:=arm_ use_gazebo:=false">
 
     <ros2_control name="${name}" type="system">
       <hardware>
@@ -29,7 +41,7 @@
       </hardware>
 
       <xacro:macro name="so101_joint" params="joint_name">
-        <joint name="${joint_name}">
+        <joint name="${prefix}${joint_name}">
           <command_interface name="position"/>
           <state_interface name="position">
             <param name="initial_value">0.0</param>
