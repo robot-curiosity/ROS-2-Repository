@@ -15,6 +15,15 @@ Two other transformations happen here:
     navigation simulation. Boxes are conservative (they never under-approximate),
     so obstacle avoidance stays safe.
 
+    The two jaws are the exception, in KEEP_MESH_COLLISION below. "Conservative"
+    means something different for a gripper: a bounding box never
+    under-approximates the jaw, and therefore never under-approximates the gap
+    between the jaws either - it fills it in. The follower's box is
+    65 x 52 x 105 mm and contains the grasp point outright, so the simulated
+    gripper was a solid brick and shoved every can it was aimed at instead of
+    closing on it. A jaw's whole job is the space beside it, which is the one
+    thing a bounding volume cannot represent.
+
 Re-run after pulling a newer upstream URDF:
 
     python3 scripts/vendor_so101.py
@@ -32,6 +41,13 @@ HERE = pathlib.Path(__file__).resolve().parent.parent
 UPSTREAM = HERE / "urdf" / "so101_upstream.urdf"
 MESHES = HERE / "meshes"
 OUT = HERE / "urdf" / "so101_macro.xacro"
+
+# Keyed on the mesh rather than the link: gripper_link also carries the servo
+# body, which is nowhere near the gap and stays a box.
+KEEP_MESH_COLLISION = {
+    "wrist_roll_follower_so101_v1.stl",   # the fixed jaw
+    "moving_jaw_so101_v1.stl",            # the moving jaw
+}
 
 UPSTREAM_URL = (
     "https://github.com/TheRobotStudio/SO-ARM100/blob/main/"
@@ -106,9 +122,15 @@ def main():
             mesh = collision.find("geometry/mesh")
             if mesh is None:
                 continue
-            stl = MESHES / pathlib.Path(mesh.get("filename")).name
+            name = pathlib.Path(mesh.get("filename")).name
+            stl = MESHES / name
             if not stl.exists():
                 sys.exit(f"missing mesh {stl}")
+
+            if name in KEEP_MESH_COLLISION:
+                mesh.set("filename",
+                         f"package://so101_description/meshes/{name}")
+                continue
 
             scale = floats(mesh.get("scale"), (1.0, 1.0, 1.0))
             lo, hi = stl_bounds(stl)
