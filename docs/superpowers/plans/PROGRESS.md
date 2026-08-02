@@ -202,6 +202,70 @@ Not one size is held at the grasp point:
 So the fix is the aim point, not the gripper and not the litter. Size is only
 free at the offset spot, where the full 33 mm can already fits.
 
+### The gripper, measured end to end, 2026-08-02 — and it still does not pick anything up
+
+`scripts/verify_pickup.py` is new and is the test this project never had: place
+a cylinder where the jaws are, run the coordinator's grasp sequence, and read
+the object's height back out of the simulator. **Five sizes, three sweeps,
+nothing lifted.** It is the first honest measurement of the thing the whole
+mission is for.
+
+Two real defects were found on the way there, both now fixed, and neither is
+sufficient.
+
+**1. `gripper_open` 1.2 was not opening the jaws.** The clear gap between the
+fixed jaw's face and the moving jaw, over the height a 70 mm can occupies:
+
+| gripper | 0.0 | 0.4 | 0.8 | 1.0 | 1.1 | 1.2 |
+|---|---|---|---|---|---|---|
+| clear gap | 15.8 mm | 38.9 | 64.1 | 78.7 | 89.2 | **jaw is above the can** |
+
+Past ~1.15 the moving jaw has swung clear over the top of the litter, so
+"open" stopped meaning a wider gap and started meaning no opposing jaw at all,
+and closing brought it down *onto* the can. Now **1.0**, which clears the
+66 mm can by 12.7 mm.
+
+**2. `arm_gripper_frame_link` is the fixed jaw's gripping face, not the middle
+of the jaws.** Its x is −7.9 mm in `arm_gripper_link`, and the fixed jaw's
+maximum x over the litter's height is −7.9 mm — the same number. Aiming it at
+the *centre* of a piece of litter therefore drives that face into the middle
+of the litter. `_grasp_target` now backs the aim off by `grasp_object_radius`,
+so the frame lands on the near wall. The clearance script agrees
+independently: a 40 mm object is pinched at +22 mm from the frame and a 24 mm
+one at +14 mm, i.e. at one radius out, which is what the fix computes.
+
+**What the sim says anyway:**
+
+| radius | 0.033 | 0.025 | 0.020 | 0.015 | 0.010 |
+|---|---|---|---|---|---|
+| outcome | shoved | not touched | not touched | *unreliable* | not touched |
+
+Repeated across three runs with the same pattern. Two things are visible in
+it, and both are measurements, not guesses:
+
+- **The descent is not vertical.** Commanded straight down, the tip travels
+  **8.3–8.5 mm outward** over the 60 mm drop, because the arm droops more as
+  it extends. Anything resting against the fixed jaw's face is raked away
+  before the jaws close — the descent nudge is 30–160 mm. This is the same
+  class of bug as the 105 mm rake the plan already fixed once, back at a
+  tenth the size and from a different cause.
+- **The 66 mm can is simply too big for this gripper.** With the pinch test
+  fixed (below) there is no position anywhere near the jaws that holds it.
+  The closed jaw pair spans 15.8 mm and the fixed jaw tip is ~12 mm across;
+  a 66 mm smooth cylinder rolls out of that. 40 mm and 24 mm objects do have
+  a pinch window on paper.
+
+Opening the descent clearance to 12 mm was tried and changed nothing: with
+more clearance the jaws close short instead.
+
+**A correction to the 2026-08-02 finding above.** The "nearest graspable spot
+is 35 mm in +x" was produced by a criterion that only asked whether the object
+was free with the jaws open and blocked with them closed. The moving jaw
+swings through a wide arc, so a can 50 mm out satisfies both while never
+touching the fixed jaw — that is a swipe, not a grip, and it is exactly what
+the mission runs did. `graspable()` now requires the object to bear on **both**
+jaws. Under it, the 66 mm can has no graspable position at all.
+
 ### Lowering the grasp plane, 2026-08-02 — as far as it goes, which is not far enough
 
 `grasp_height` is now **0.040**, down from 0.050, and it is also in

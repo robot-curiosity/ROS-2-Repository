@@ -140,8 +140,20 @@
     confirm_pose: [0.0, 0.9, 0.46, -1.40, 0.0, 0.0]
     stow_pose: [0.0, -1.20, 1.55, 1.10, 0.0, 0.0]
 
-    gripper_open: 1.2
+    # MEASURED off the collision meshes: the clear gap between the fixed
+    # jaw's face and the moving jaw, over the height a 70 mm can occupies.
+    # 15.8 mm at 0.0, 38.9 at 0.4, 64.1 at 0.8, 78.7 at 1.0, 89.2 at 1.1 -
+    # and at 1.2 the moving jaw is ABOVE the can altogether. That is what the
+    # old 1.2 did: it did not open the jaws, it lifted one clear of the
+    # litter, so closing swept down onto the can rather than around it.
+    # 1.0 clears the 66 mm can by 12.7 mm. 0.8 leaves 64.1 and clips it.
+    gripper_open: 1.0
     gripper_closed: 0.0
+    # Half the width of the litter being grasped. The grasp point is backed
+    # off by this, because arm_gripper_frame_link sits on the fixed jaw's
+    # face rather than between the jaws. 0.033 is the test field's can; the
+    # detector does not report a size yet.
+    grasp_object_radius: 0.033
     # The plane the jaws close on, metres above ground. Here rather than only
     # in the node's defaults because it is the one knob that trades reachable
     # band against how short a piece of litter can be gripped, and the answer

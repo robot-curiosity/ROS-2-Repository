@@ -172,8 +172,22 @@ class Coordinator(Node):
             "search_pose": [0.0, -1.4, 0.0, 0.4, 0.0, 0.0],
             "confirm_pose": [0.0, 0.9, 0.46, -1.40, 0.0, 0.0],
             "stow_pose": [0.0, -1.20, 1.55, 1.10, 0.0, 0.0],
-            "gripper_open": 1.2,
+            # MEASURED, and 1.2 was past the end of the useful travel. The
+            # clear gap between the fixed jaw's face and the moving jaw, over
+            # the height a 70 mm can occupies: 15.8 mm closed, 38.9 at 0.4,
+            # 64.1 at 0.8, 78.7 at 1.0, 89.2 at 1.1 - and at 1.2 the moving
+            # jaw is ABOVE the can entirely. Opening to 1.2 therefore did not
+            # open the jaws, it lifted one of them clear of the litter, and
+            # closing brought it down ONTO the can instead of around it.
+            # 1.0 clears the 66 mm test can by 12.7 mm.
+            "gripper_open": 1.0,
             "gripper_closed": 0.0,
+            # NOT MEASURED FROM THE SCENE - the detector does not report a
+            # size yet. This is the test field's can (0.066 m across) and it
+            # is what the grasp point is backed off by; see _grasp_target.
+            # When the detector reports a width, derive it per target and
+            # delete this.
+            "grasp_object_radius": 0.033,
             # LOW ENOUGH FOR SHORT LITTER, and no lower than the workspace
             # allows. The jaws' lowest material sits 6.4 mm under this frame,
             # so the grasp plane is what decides the shortest object the jaws
@@ -666,8 +680,18 @@ class Coordinator(Node):
         if grasp_plane is not None:
             target = (target[0], target[1], grasp_plane)
 
-        radius, _ = self.planar_arm.to_planar(
-            target, self.planar_arm.bearing(target))
+        bearing = self.planar_arm.bearing(target)
+        radius, planar_z = self.planar_arm.to_planar(target, bearing)
+
+        # THE JAWS CLOSE ONTO THIS FRAME, NOT AROUND IT. Measured off the
+        # collision meshes: arm_gripper_frame_link sits ON the fixed jaw's
+        # gripping face, and the moving jaw swings in from further out. Aiming
+        # it at the litter's centre therefore drives that face into the middle
+        # of the litter and the closing jaw shoves it - which is what every
+        # run did. The near wall is where the frame belongs, so back off by
+        # the object's radius. See scripts/verify_gripper_clearance.py.
+        radius -= self.p("grasp_object_radius")
+        target = self.planar_arm.from_planar(radius, planar_z, bearing)
         return target, radius
 
     def _grasp_solvable(self, target) -> bool:

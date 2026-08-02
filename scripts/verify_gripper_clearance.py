@@ -31,8 +31,11 @@ arm_gripper_link's frame:
   - how far the jaws hang below that point, which is what decides the
     shortest litter they can close around rather than above
   - which grasp heights hold which of the test field's litter, and where
-  - the nearest spot that is actually graspable - free with the jaws open and
-    trapped once they close, which free space alone does not imply
+  - the window that is actually graspable: PINCHED, meaning clear of both
+    jaws when open, reached by the moving jaw when closed, and bearing on the
+    fixed jaw at the same time. Free-then-blocked is not enough - the moving
+    jaw swings through a wide arc and satisfies it while shoving the object
+    past a fixed jaw it never touches
 
 Run it after touching the jaw geometry, grasp_height, or the gripper limits.
 It exits non-zero when the can does not fit where the arm aims, which is the
@@ -359,7 +362,8 @@ def main() -> int:
     open_solids, closed_solids = placed_at(OPEN_ANGLE), placed_at(CLOSED_ANGLE)
 
     below = jaw_reach_below(grasp, axis, open_solids, closed_solids)
-    sweep_object_sizes(grasp, axis, open_solids, closed_solids, below)
+    sweep_object_sizes(grasp, axis, open_solids, closed_solids, below,
+                       fixed_solids=fixed_solids)
 
     floor, band_width = lowest_reachable_grasp_height(urdf)
     short_litter_ok = report_short_litter(below, floor)
@@ -368,7 +372,25 @@ def main() -> int:
     # Where the gap actually is, if it is not where the arm is aiming. The
     # coordinator drives gripper_frame_link to the target, so an opening
     # offset from that frame is a bias the grasp pose has to carry.
-    best = search_opening(grasp, axis, open_solids, closed_solids)
+    print("\nGraspable window, along the gripper's own axes, from the aim "
+          "point:")
+    for label, direction in (("x (radial at the grasp pose)",
+                              np.array([1.0, 0.0, 0.0])),
+                             ("y (lateral)", np.array([0.0, 1.0, 0.0]))):
+        for name, radius, height in OBJECTS:
+            window = grasp_window(grasp, axis, open_solids, closed_solids,
+                                  radius, height, direction,
+                                  fixed_solids=fixed_solids)
+            if window is None:
+                print(f"  {label:28s} {name:>16s}  none")
+            else:
+                low, high = window
+                print(f"  {label:28s} {name:>16s}  "
+                      f"{low*1000:+.0f} .. {high*1000:+.0f} mm, "
+                      f"centre {(low+high)/2*1000:+.1f} mm")
+
+    best = search_opening(grasp, axis, open_solids, closed_solids,
+                          fixed_solids=fixed_solids)
     if best is None:
         print("\nNo spot near the jaws holds the can with the jaws open and "
               "traps it when they close - the gripper cannot grasp it "
@@ -391,8 +413,10 @@ def main() -> int:
     return 0
 
 
-# coordinator.yaml's gripper_open and gripper_closed.
-OPEN_ANGLE = 1.2
+# coordinator.yaml's gripper_open and gripper_closed. 1.0 rather than the
+# old 1.2 because at 1.2 the moving jaw swings above the litter altogether,
+# so "open" stops meaning a wider gap and starts meaning no opposing jaw.
+OPEN_ANGLE = 1.0
 CLOSED_ANGLE = 0.0
 SEARCH_HALF_WIDTH = 0.06
 SEARCH_STEP = 0.005
@@ -402,23 +426,45 @@ OBJECT_RADII = [0.005, 0.010, 0.015, 0.020, 0.025, 0.033]
 OBJECT_HEIGHTS = [0.024, 0.040, 0.070]
 
 
-def graspable(radius, height, grasp, axis, open_solids, closed_solids,
-              grasp_height=GRASP_HEIGHT) -> bool:
-    """Free with the jaws open, and caught once they close.
+# How close the fixed jaw has to be to count as bearing on the object. The
+# jaws are rigid and the object is rigid, so a pinch is contact on both sides;
+# 2 mm is the slack that stands in for a real gripper's compliance.
+PINCH_TOLERANCE = 0.002
 
-    The second half is what separates a grasp from a near miss. An object the
-    jaws close straight past is not held, and an object entirely below them
-    clears everything precisely because they never touch it.
+
+def graspable(radius, height, grasp, axis, open_solids, closed_solids,
+              grasp_height=GRASP_HEIGHT, fixed_solids=None) -> bool:
+    """Pinched between BOTH jaws, not merely swept by the moving one.
+
+    "Free when open, not free when closed" is not enough, and believing it
+    cost a whole analysis: the moving jaw swings through a wide arc, so a can
+    sitting 50 mm out satisfies both halves while never touching the fixed jaw
+    at all. The jaws close past one side of it and shove it - which is exactly
+    what the mission runs did.
+
+    A grip needs the object bearing on both sides. The fixed jaw never moves,
+    so it cannot overlap the object at the closed angle without also
+    overlapping at the open one; what it must do instead is sit within
+    PINCH_TOLERANCE of the object's wall. Inflating the object by that
+    tolerance and asking whether it still clears is how that is measured
+    without a distance-to-mesh routine.
     """
-    if not fits(radius, grasp, axis, open_solids, samples=36,
-                height=height, grasp_height=grasp_height):
+    def clear(r, solids):
+        return fits(r, grasp, axis, solids, samples=36, height=height,
+                    grasp_height=grasp_height)
+
+    if not clear(radius, open_solids):
         return False
-    return not fits(radius, grasp, axis, closed_solids, samples=36,
-                    height=height, grasp_height=grasp_height)
+    if clear(radius, closed_solids):
+        return False            # the jaws shut without reaching it
+    if fixed_solids is None:
+        return True
+    # Bearing on the fixed jaw: clear of it, but only just.
+    return not clear(radius + PINCH_TOLERANCE, fixed_solids)
 
 
 def sweep_object_sizes(grasp, axis, open_solids, closed_solids,
-                       below: float) -> None:
+                       below: float, fixed_solids=None) -> None:
     """Whether a smaller object would be gripped at the point the arm aims."""
     print(f"\nAt the grasp point, by object size "
           f"(grasp_height {GRASP_HEIGHT}):")
@@ -427,7 +473,7 @@ def sweep_object_sizes(grasp, axis, open_solids, closed_solids,
         cells = []
         for height in OBJECT_HEIGHTS:
             held = graspable(radius, height, grasp, axis, open_solids,
-                             closed_solids)
+                             closed_solids, fixed_solids=fixed_solids)
             # The jaws hang `below` the aim frame, so what an object has to
             # clear is the tips, not the grasp plane itself.
             reaches = height > GRASP_HEIGHT - below
@@ -442,7 +488,7 @@ def sweep_object_sizes(grasp, axis, open_solids, closed_solids,
 
 def search_opening(grasp, axis, open_solids, closed_solids,
                    radius=CAN_RADIUS, height=CAN_HEIGHT,
-                   grasp_height=GRASP_HEIGHT):
+                   grasp_height=GRASP_HEIGHT, fixed_solids=None):
     """The nearest spot the jaws could actually grasp this object at.
 
     Free space alone is not a grasp - the air beside the gripper is free too.
@@ -459,9 +505,30 @@ def search_opening(grasp, axis, open_solids, closed_solids,
                     and np.linalg.norm(offset) >= np.linalg.norm(best):
                 continue
             if graspable(radius, height, grasp + offset, axis, open_solids,
-                         closed_solids, grasp_height=grasp_height):
+                         closed_solids, grasp_height=grasp_height,
+                         fixed_solids=fixed_solids):
                 best = offset
     return best
+
+
+def grasp_window(grasp, axis, open_solids, closed_solids, radius, height,
+                 direction, span=0.09, step=0.002, fixed_solids=None):
+    """The whole interval along `direction` that holds the object, not its edge.
+
+    `search_opening` answers "is there anywhere" and returns the nearest such
+    spot, which is the wrong point to aim at - it is one grid step inside the
+    boundary. A frame belongs in the middle of the window, where the jaws close
+    symmetrically and a few millimetres of aim error still grips.
+    """
+    offsets = np.arange(-span, span + 1e-9, step)
+    held = [
+        d for d in offsets
+        if graspable(radius, height, grasp + d * direction, axis,
+                     open_solids, closed_solids, fixed_solids=fixed_solids)
+    ]
+    if not held:
+        return None
+    return min(held), max(held)
 
 
 def jaw_reach_below(grasp, axis, open_solids, closed_solids) -> float:
@@ -482,7 +549,9 @@ def jaw_reach_below(grasp, axis, open_solids, closed_solids) -> float:
 # The two litter models in worlds/test_field.sdf. The wrapper is a
 # 80 x 50 x 24 mm box; 0.025 is the half-width the jaws would have to close
 # on, which is the dimension a cylinder stands in for here.
-OBJECTS = [("can 33x70", 0.033, 0.070), ("wrapper 25x24", 0.025, 0.024)]
+OBJECTS = [("can 33x70", 0.033, 0.070), ("wrapper 25x24", 0.025, 0.024),
+           ("bottle 20x70", 0.020, 0.070), ("tube 12x70", 0.012, 0.070),
+           ("rod 6x70", 0.006, 0.070)]
 # Below this the radial band the base has to be creeped into collapses; the
 # 20 mm creep deadband needs somewhere to sit. Matches verify_grasp_band.py.
 MIN_BAND_WIDTH = 0.050
