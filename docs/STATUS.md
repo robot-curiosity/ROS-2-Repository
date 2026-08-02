@@ -21,7 +21,7 @@ reading code — figures quoted here have a measurement behind them.
 | Nav2 | Done — reaches goals, routes around obstacles |
 | Measurement rig | Done, produced the accuracy numbers |
 | Parts list | Done — `bom.md`, pack decision made, nothing ordered |
-| **Behaviour coordinator** | **In progress** — runs end to end to PICKING with range controlled; grasp blocked on the gripper never opening as commanded |
+| **Behaviour coordinator** | **In progress** — runs end to end to PICKING with range controlled. The grasp itself lifts flat litter as of 2026-08-02 (`scripts/verify_pickup.py`); the 66 mm cans are still too wide for the jaws, and no full mission run has been done since the mount came down |
 | **Pico firmware** | **Not started** |
 | **Real sensor drivers** | **Not started** |
 | **Battery monitor** | **Not started** |
@@ -68,8 +68,13 @@ ros2 launch drivebase_navigation navigation.launch.py use_sim_time:=true
 ros2 run teleop_twist_keyboard teleop_twist_keyboard
 ```
 
-`sim.launch.py` flags: `headless`, `rviz`, `ekf`, `gps`, `arm`, `litter_detector`,
-`wheel_mu1`, `wheel_mu2`, `wheel_slip`, `slip_lateral`, `slip_longitudinal`.
+`sim.launch.py` flags: `world`, `headless`, `rviz`, `ekf`, `gps`, `arm`,
+`litter_detector`, `wheel_mu1`, `wheel_mu2`, `wheel_slip`, `slip_lateral`,
+`slip_longitudinal`.
+
+`world:=grasp_lab` is a bare ground plane for gripper experiments — no
+obstacles and no field litter for a flung probe to land among. `world:=`
+takes a name in `drivebase_sim/worlds`, without the `.sdf`.
 
 Needs a real GPU. Software rendering works (`LIBGL_ALWAYS_SOFTWARE=1`) but runs
 well under real time and starves the control loops.
@@ -224,7 +229,7 @@ Every one of these failed **silently** — no error on either side.
 | The arm aims correctly, the gate passes, the grasp runs — and the litter is shoved across the field instead of lifted | The gripper's collision geometry had no gap. Bounding boxes never under-approximate a jaw, and so never under-approximate the *gap between* the jaws either — they fill it in. The fixed jaw's box was 65 × 52 × 105 mm and contained the grasp point, making the simulated gripper a solid brick. The two jaws keep mesh collisions as of 2026-08-02, which cost nothing measurable (RTF 0.979 vs 0.977). `scripts/verify_gripper_clearance.py` guards it |
 | Flat litter is never grasped however well the arm aims | `grasp_height` closed the jaws well above the ground — `litter_wrapper` is **24 mm tall** and two of the world's three litter models are 70 mm cans, which hid it. **No software value fixed this at the 260 mm mount.** The lowest grasp plane the base can still be creeped into sits a fixed **222 mm below the mount**, so 260 put the floor at 38 mm while the jaw tips hang only 6.3 mm below the frame the IK aims — they shut 32 mm up in the air. The mount came down to **224 mm** on 2026-08-02 and `grasp_height` to 0.020, which puts the tips at 13.7 mm and *also* widens the radial band from 70 mm to 142 mm. 215 mm is the hard floor: the arm base would then reach into the ultrasonic band |
 | Litter still not gripped once the jaws have a gap | Three causes, all measured 2026-08-02, all fixed. **`gripper_open` 1.2 did not open the jaws** — past ~1.15 the moving jaw swings clear over the top of the litter, so closing brings it down onto the object rather than around it (clear gap: 15.8 mm at 0.0, 64.1 at 0.8, 78.7 at 1.0, gone at 1.2). Now 1.0. **`arm_gripper_frame_link` IS the fixed jaw's face** — its x equals the jaw's own maximum x over the litter's height — so aiming it at the litter's centre drove that face into the middle of the litter. The coordinator now backs off by `grasp_object_radius`. **`gripper_closed` 0.0 was not closed** — the joint's lower stop is −0.174533 and the whole grip lives in that last 0.175 rad: at 0.0 the jaw faces still stand 15.8 mm apart at the tip and splay wider going up, so the pair is a fixed V that a can rolls out of. At the stop the tip gap is 1.9 mm. Every earlier conclusion about what these jaws can hold was measured half open |
-| The descent is commanded straight down and is not | Droop grows with extension, so over the 60 mm pre-grasp drop the tip travels **8.3–8.5 mm outward**. Anything resting against the fixed jaw is raked away before the jaws close — measured nudges of 30–160 mm. Same class as the 105 mm rake fixed in Task 12, at a tenth the size and from a different cause |
+| The descent is commanded straight down and is not | **Six P-controlled joints handed one new setpoint do not carry the tip along the line between the two poses.** Each converges at its own rate, so the tip bulges out of the column and rakes whatever is standing in it — measured with the litter placed clear of the *whole* swept column, a one-shot 60 mm drop moved a 50 × 24 mm disc **33 mm sideways**, a 30 × 24 mm disc 38 mm and a 66 × 70 mm can 19 mm outward, all before the gripper closed at all. Stepped into 6 waypoints the same disc moves 4.9 mm **and is lifted** — the first verified pickup in this project. `grasp_descent_steps` in `coordinator.yaml`; swept with `scripts/grasp_lab.py`. Droop is real but separate and an order of magnitude smaller (the face sits 5.6 mm further out at pre-grasp than at the grasp, which is why litter is placed clear of the outermost swept position, not the final one) |
 | The test field's 66 mm cans are near the limit of what these jaws hold | The jaw pair is ~12 mm across at the tip. Closed to the real stop there IS a pinch window for a 66 mm cylinder, but it is one 2 mm grid step wide, at +34 mm from the aim frame — one radius plus the jaw-face clearance. 40 mm and 24 mm objects have the same one-radius offset and more room. Litter much wider than the jaws rolls out |
 | A joint holds ~0.3 rad short of its command, far inside its limit | `arm_joint_hold` gave all six joints `p_gain` 4.0. Steady-state error is the joint's resisting torque over the gain, and the gripper carries ~1.2 N·m — so it sat 0.317 rad short and then crawled in on the integrator at 0.003 rad/s, long after any hold expired. Looks exactly like a limit or a jammed jaw. `scripts/measure_gripper_sweep.py` tells them apart |
 | Outer ultrasonics read a constant 0.08 m | They were staring at the front wheels; sensor band raised to 200 mm |

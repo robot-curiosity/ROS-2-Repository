@@ -213,6 +213,10 @@ class Coordinator(Node):
             # 60 mm clears a 70 mm can's rim and is solvable at every radius in
             # the grasp band - checked across the band, not at one point.
             "grasp_approach_height": 0.060,
+            # Waypoints down that column, so the tip tracks it instead of
+            # cutting the corner between two poses. Costs one grasp_hold_
+            # seconds each; see grasp_sequence for what one-shot did.
+            "grasp_descent_steps": 6,
             "grasp_hold_seconds": 1.5,
             "wrist_roll_limit": 1.0,
             "approach_angle": -1.5708,
@@ -752,28 +756,30 @@ class Coordinator(Node):
         inside the ToF's minimum range. See the design doc §6.
         """
         angle = self.p("approach_angle")
-        solution = solve(self.planar_arm, target, angle, JOINT_LIMITS)
-        if solution is None:
-            self.get_logger().warning(
-                f"target {target} unreachable, abandoning this piece")
-            self.arm.start_sequence([])
-            return
 
-        # The point the jaws descend FROM, solved rather than approximated. It
-        # is the same target lifted straight up, so the move between the two is
-        # vertical - see grasp_sequence for what the old approximation did.
-        above = (target[0], target[1], target[2] + self.p("grasp_approach_height"))
-        clearance = solve(self.planar_arm, above, angle, JOINT_LIMITS)
-        if clearance is None:
-            self.get_logger().warning(
-                f"no vertical approach to {target}, abandoning this piece")
-            self.arm.start_sequence([])
-            return
+        # Every point down the vertical column above the target, solved
+        # individually, pre-grasp first. Commanding only the two ends lets the
+        # tip bulge out of the column between them and rake the litter away -
+        # see grasp_sequence, which is where that is measured.
+        steps = int(self.p("grasp_descent_steps"))
+        height = self.p("grasp_approach_height")
+        descent = []
+        for step in range(steps + 1):
+            above = (target[0], target[1],
+                     target[2] + height * (1.0 - step / steps))
+            solution = solve(self.planar_arm, above, angle, JOINT_LIMITS)
+            if solution is None:
+                self.get_logger().warning(
+                    f"no vertical approach to {target}: nothing solves "
+                    f"{height * (1.0 - step / steps):.3f} m up the column. "
+                    "Abandoning this piece")
+                self.arm.start_sequence([])
+                return
+            descent.append(solution)
 
         self.stored_grasp_point = target
         self.arm.start_sequence(grasp_sequence(
-            solution,
-            clearance,
+            descent,
             self._pose("search_pose"),
             self.p("gripper_open"),
             self.p("gripper_closed"),

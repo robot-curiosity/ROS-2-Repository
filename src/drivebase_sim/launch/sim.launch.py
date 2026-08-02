@@ -44,7 +44,8 @@ def generate_launch_description() -> LaunchDescription:
     description_pkg = FindPackageShare("drivebase_description")
     sim_pkg = FindPackageShare("drivebase_sim")
 
-    world_file = PathJoinSubstitution([sim_pkg, "worlds", "test_field.sdf"])
+    world_file = PathJoinSubstitution(
+        [sim_pkg, "worlds", [LaunchConfiguration("world"), ".sdf"]])
     bridge_config = PathJoinSubstitution([sim_pkg, "config", "bridge.yaml"])
     rviz_config = PathJoinSubstitution([sim_pkg, "rviz", "sim.rviz"])
     xacro_file = PathJoinSubstitution(
@@ -95,6 +96,12 @@ def generate_launch_description() -> LaunchDescription:
     return LaunchDescription([
         SetEnvironmentVariable("GZ_SIM_RESOURCE_PATH", resource_path),
 
+        DeclareLaunchArgument(
+            "world", default_value="test_field",
+            description="World name in drivebase_sim/worlds, without .sdf. "
+                        "grasp_lab is a bare ground plane for gripper "
+                        "experiments - see that file for why.",
+        ),
         DeclareLaunchArgument(
             "headless",
             default_value="false",

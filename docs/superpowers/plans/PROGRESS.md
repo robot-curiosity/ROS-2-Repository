@@ -383,28 +383,39 @@ navigation log before reading anything into a run.**
 
 ### Next, in detail
 
-**1. Give the jaws an opening — see "The gripper has no opening" above.** This
-is the one thing between a converging pick and a pickup, and it needs a
-decision about collision geometry rather than an investigation.
+**1. Litter this gripper can hold.** The 66 × 70 mm cans are the last thing
+that still fails. The jaw pair is ~12 mm across at the tip and the pinch window
+for a 66 mm cylinder is one 2 mm grid step wide — measured, and it shows in the
+simulator as a can that is nudged, rolls, and is gone. Flat litter (24 mm tall,
+30–50 mm across) is lifted reliably. Either the test field gets litter the
+hardware could actually hold, or the jaws change; this is a decision, not an
+investigation.
 
-**2. The descent is not a descent.** Six P-controlled joints handed one new
-setpoint do not carry the tip along the line between the two poses — each
-converges at its own rate and the tip bulges out of the column. Measured at the
-224 mm mount, with the object placed clear of the *whole* swept column: a
-one-shot drop from 60 mm knocked a 50 × 24 mm disc **33 mm sideways** and a
-66 × 70 mm can **19 mm outward**, both before the gripper closed at all. The
-jaws then shut on nothing. This is now the whole of what stands between the
-geometry and a pickup. `scripts/verify_pickup.py` steps the tip down the column
-in 10 mm waypoints to test it; if that is what fixes it, `arm_driver.py`'s
-`grasp_sequence` needs the same treatment rather than two poses.
-
-**3. Re-measure what the mount drop invalidated.** The mount moved to 224 mm on
+**2. Re-measure what the mount drop invalidated.** The mount moved to 224 mm on
 2026-08-02 and the pod came down 36 mm with it, but the poses were not
 re-measured: `confirm_pose` via `scripts/pod_aim_search.py`, `search_pose`,
 `approach_bbox_height_min`, `grasp_min`/`grasp_max`, and §1/§3 of
 `docs/arm_workspace.md`. That document's §7 lists them.
 
-The item below is **done**; kept for the reasoning, which held up.
+The items below are **done**; kept for the reasoning, which held up.
+
+**1a. The descent was not a descent — fixed 2026-08-02, and it is what
+produced the first pickup this project has had.** Six P-controlled joints
+handed one new setpoint do not carry the tip along the line between the two
+poses: each converges at its own rate, so the tip bulges out of the column and
+rakes the litter out before the gripper closes. Measured at the 224 mm mount
+with the object placed clear of the *whole* swept column, one-shot from 60 mm:
+
+| | one-shot | 6 waypoints |
+|---|---|---|
+| 50 × 24 mm disc | moved 33.0 mm, never touched again | moved **4.9 mm, LIFTED 58.8 mm** |
+| 30 × 24 mm disc | moved 37.9 mm | moved **6.7 mm, LIFTED 60.4 mm** |
+| 66 × 70 mm can | moved 19.2 mm outward, then flung | moved 14.9 mm, still shoved |
+
+`grasp_sequence` now takes a column of solved poses rather than two ends, and
+`grasp_descent_steps` sets how many. This is the same failure as the old
+shoulder_lift-perturbation "descent" that launched a can 1.6 m, at a twentieth
+the size — and it looked like a physics fault both times.
 
 **1a. The gripper never opens as commanded.** `gripper_open` is 1.200 and the
 joint reaches 0.937–1.088 across every pose, well inside the URDF limit of

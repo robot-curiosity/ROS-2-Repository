@@ -83,8 +83,7 @@ def _pose_of(solution) -> dict[str, float]:
 
 
 def grasp_sequence(
-    grasp,
-    approach,
+    descent,
     search_pose: dict[str, float],
     gripper_open: float,
     gripper_closed: float,
@@ -92,28 +91,40 @@ def grasp_sequence(
 ) -> list[tuple[dict[str, float], float]]:
     """Descend vertically onto the target, close, lift vertically, return.
 
-    BOTH POSES ARE SOLVED BY IK. `approach` is the solution for a point
-    directly above `grasp`, so the move between them is a straight vertical
-    line and the jaws come down around the litter rather than across it.
+    `descent` is IK solutions for points down the vertical column above the
+    target, pre-grasp FIRST and the grasp itself LAST. Every one is solved,
+    none is interpolated in joint space.
 
-    This used to build the approach by subtracting a constant from
-    shoulder_lift, which reads like a vertical offset and is not one. Measured
-    at the centre of the grasp band: that perturbation raised the tip 56 mm but
-    also swung it 105 mm OUTWARD, so the "descent" was a diagonal rake that
-    swept the open jaws sideways through the litter. In sim it launched a 15 g
-    can 1.6 m across the field, which looked like a physics or collision fault
-    and was neither.
+    IT HAS TO BE A COLUMN OF POSES, NOT TWO. Six P-controlled joints handed a
+    single new setpoint do not carry the tip along the line between the two
+    poses - each converges at its own rate, so the tip bulges out of the
+    column on the way down and rakes whatever is standing in it. Measured at
+    the 224 mm mount with the litter placed clear of the whole swept column:
+    one-shot, a 50 x 24 mm disc was knocked 33 mm sideways and a 66 x 70 mm
+    can 19 mm outward, both before the gripper closed at all, and nothing was
+    ever picked up. Stepped, the same disc moves 4.9 mm and is lifted. The
+    waypoints are what makes the descent vertical in fact rather than in
+    intent.
 
-    Pre-grasp comes first with the gripper already open: opening it after
-    arriving would sweep the jaws through the litter just as surely.
+    An earlier version built the pre-grasp by subtracting a constant from
+    shoulder_lift, which reads like a vertical offset and is not one: measured
+    at the centre of the grasp band it raised the tip 56 mm and swung it 105 mm
+    OUTWARD, a diagonal rake that launched a 15 g can 1.6 m. Same failure,
+    twenty times the size, and it looked like a physics fault both times.
+
+    The gripper is already open at the first pose: opening it after arriving
+    would sweep the jaws through the litter just as surely.
     """
-    reach = _pose_of(grasp)
-    clear = _pose_of(approach)
+    if not descent:
+        return []
+    clear = _pose_of(descent[0])
+    reach = _pose_of(descent[-1])
 
-    return [
-        (dict(clear, gripper=gripper_open), hold_seconds),
-        (dict(reach, gripper=gripper_open), hold_seconds),
+    steps = [(dict(_pose_of(s), gripper=gripper_open), hold_seconds)
+             for s in descent]
+    steps += [
         (dict(reach, gripper=gripper_closed), hold_seconds),
         (dict(clear, gripper=gripper_closed), hold_seconds),
         (dict(search_pose, gripper=gripper_closed), hold_seconds),
     ]
+    return steps

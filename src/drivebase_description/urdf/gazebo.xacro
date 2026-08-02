@@ -240,6 +240,38 @@
   <xacro:wheel_surface link="rear_right_wheel_link"/>
 
   <!-- ==================================================================
+       JAW CONTACT
+       Rubber pads on the gripping faces, which is what every real gripper
+       does and what the printed SO-101 jaws would need.
+
+       READ THIS BEFORE TUNING IT. sdformat's default mu is 1.0
+       (sdformat14/1.11/surface.sdf), so the jaws were ALREADY at a
+       rubber-grade coefficient before this block existed - rubber on metal is
+       0.8-1.2. Setting it explicitly documents the assumption and makes it
+       sweepable; it does not make the jaws grippier than the runs that
+       failed. If a grasp fails at this value it is not failing for want of
+       friction, and no value of arm_jaw_mu will fix it - the 66 mm cans do
+       not fail here, they fail because the jaw pair spans 15.8 mm closed and
+       a cylinder that wide is never enclosed.
+
+       Set on the two links that carry mesh collisions, i.e. the two that can
+       touch litter. dartsim takes ONE coefficient, so there is no mu2 to set
+       - see the wheel-slip note below for what that cost last time.
+       ================================================================== -->
+  <xacro:property name="arm_jaw_mu" value="$(arg arm_jaw_mu)"/>
+
+  <xacro:if value="$(arg use_arm)">
+    <gazebo reference="arm_gripper_link">
+      <mu1>${arm_jaw_mu}</mu1>
+      <mu2>${arm_jaw_mu}</mu2>
+    </gazebo>
+    <gazebo reference="arm_moving_jaw_so101_v1_link">
+      <mu1>${arm_jaw_mu}</mu1>
+      <mu2>${arm_jaw_mu}</mu2>
+    </gazebo>
+  </xacro:if>
+
+  <!-- ==================================================================
        WHEEL SLIP
        The mu1/mu2 pair above maps to ODE's friction element. gz-sim's default
        physics engine is dartsim, which takes ONE friction coefficient and

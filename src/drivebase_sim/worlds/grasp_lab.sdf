@@ -1,0 +1,84 @@
+<?xml version="1.0"?>
+<!--
+  Bare world for grasp experiments: ground, light, and nothing else.
+
+  test_field.sdf is the right world for driving and for the mission, and the
+  wrong one for the gripper. Its barriers, posts and three litter models all
+  sit within metres of the robot, and a probe that gets flung - which is most
+  of what a failing grasp does - lands among them and is then interacted with
+  by things the experiment is not about. Here a failed trial leaves the probe
+  alone on a plane, where `set_pose` can put it back.
+
+  Physics, the plugin set and the ground friction are copied from
+  test_field.sdf deliberately: the point is to change the scene and nothing
+  else, so a result here transfers.
+
+    bash scripts/dev.sh ros2 launch drivebase_sim sim.launch.py \
+        world:=grasp_lab headless:=true litter_detector:=false
+-->
+<sdf version="1.10">
+  <world name="grasp_lab">
+
+    <physics name="1ms" type="ignored">
+      <max_step_size>0.001</max_step_size>
+      <real_time_factor>1.0</real_time_factor>
+    </physics>
+
+    <plugin filename="gz-sim-physics-system"
+            name="gz::sim::systems::Physics"/>
+    <plugin filename="gz-sim-user-commands-system"
+            name="gz::sim::systems::UserCommands"/>
+    <plugin filename="gz-sim-scene-broadcaster-system"
+            name="gz::sim::systems::SceneBroadcaster"/>
+    <plugin filename="gz-sim-contact-system"
+            name="gz::sim::systems::Contact"/>
+    <plugin filename="gz-sim-imu-system"
+            name="gz::sim::systems::Imu"/>
+    <plugin filename="gz-sim-navsat-system"
+            name="gz::sim::systems::NavSat"/>
+    <plugin filename="gz-sim-sensors-system"
+            name="gz::sim::systems::Sensors">
+      <render_engine>ogre2</render_engine>
+    </plugin>
+
+    <!-- The robot carries a NavSat sensor whether or not this world is about
+         navigation, and it is silent without this block. -->
+    <spherical_coordinates>
+      <surface_model>EARTH_WGS84</surface_model>
+      <world_frame_orientation>ENU</world_frame_orientation>
+      <latitude_deg>34.0522</latitude_deg>
+      <longitude_deg>-118.2437</longitude_deg>
+      <elevation>89.0</elevation>
+    </spherical_coordinates>
+
+    <gravity>0 0 -9.8</gravity>
+
+    <light type="directional" name="sun">
+      <cast_shadows>true</cast_shadows>
+      <pose>0 0 10 0 0 0</pose>
+      <diffuse>0.9 0.9 0.9 1</diffuse>
+      <specular>0.3 0.3 0.3 1</specular>
+      <direction>-0.5 0.3 -0.9</direction>
+    </light>
+
+    <model name="ground_plane">
+      <static>true</static>
+      <link name="link">
+        <collision name="collision">
+          <geometry><plane><normal>0 0 1</normal><size>100 100</size></plane></geometry>
+          <surface>
+            <friction><ode><mu>0.9</mu><mu2>0.9</mu2></ode></friction>
+          </surface>
+        </collision>
+        <visual name="visual">
+          <geometry><plane><normal>0 0 1</normal><size>100 100</size></plane></geometry>
+          <material>
+            <ambient>0.35 0.38 0.35 1</ambient>
+            <diffuse>0.45 0.48 0.45 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+  </world>
+</sdf>
