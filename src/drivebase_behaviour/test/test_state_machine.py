@@ -10,8 +10,6 @@ CONFIG = Config(
     deadband=0.12,
     confirm_frames=5,
     confirm_frames_fallback=10,
-    grasp_min=0.15,
-    grasp_max=0.35,
     lost_timeout=2.0,
     approach_timeout=30.0,
     confirm_timeout=8.0,
@@ -34,7 +32,7 @@ def unseen(now):
 
 def blank(now, **kw):
     base = dict(
-        now=now, detection=None, range_m=float("nan"), range_valid=False,
+        now=now, detection=None, grasp_reachable=False, range_settled=False,
         in_workspace=False, nav_goal_active=True, nav_goal_succeeded=False,
         nav_goal_aborted=False, arm_sequence_done=False,
     )
@@ -135,12 +133,12 @@ def test_confirmation_needs_consecutive_good_frames():
     t = 2.0
     for _ in range(CONFIG.confirm_frames - 1):
         t += 0.1
-        out = m.tick(blank(t, detection=seen(t), range_m=0.25,
-                           range_valid=True, in_workspace=True))
+        out = m.tick(blank(t, detection=seen(t), grasp_reachable=True,
+                           range_settled=True, in_workspace=True))
         assert out.state is State.CONFIRMING
     t += 0.1
-    out = m.tick(blank(t, detection=seen(t), range_m=0.25,
-                       range_valid=True, in_workspace=True))
+    out = m.tick(blank(t, detection=seen(t), grasp_reachable=True,
+                       range_settled=True, in_workspace=True))
     assert out.state is State.PICKING
     assert out.store_grasp_point is True
     assert out.start_grasp is True
@@ -151,35 +149,43 @@ def test_an_off_centre_frame_resets_the_confirmation_count():
     t = 2.0
     for _ in range(CONFIG.confirm_frames - 1):
         t += 0.1
-        m.tick(blank(t, detection=seen(t), range_m=0.25,
-                     range_valid=True, in_workspace=True))
+        m.tick(blank(t, detection=seen(t), grasp_reachable=True,
+                     range_settled=True, in_workspace=True))
     t += 0.1
-    out = m.tick(blank(t, detection=seen(t, error=0.4), range_m=0.25,
-                       range_valid=True, in_workspace=True))
+    out = m.tick(blank(t, detection=seen(t, error=0.4), grasp_reachable=True,
+                       range_settled=True, in_workspace=True))
     assert out.state is State.CONFIRMING
     t += 0.1
-    out = m.tick(blank(t, detection=seen(t), range_m=0.25,
-                       range_valid=True, in_workspace=True))
+    out = m.tick(blank(t, detection=seen(t), grasp_reachable=True,
+                       range_settled=True, in_workspace=True))
     assert out.state is State.CONFIRMING
 
 
-def test_an_invalid_range_never_confirms():
+def test_an_unreachable_target_never_confirms():
+    """Settled on a radius the arm cannot solve is still not a grasp.
+
+    This is the case the old camera-range window let through: it passed on
+    targets at 0.039 and 0.015 m, the mission stopped for them, and the IK
+    then refused them.
+    """
     m = confirming(StateMachine(CONFIG))
     t = 2.0
     for _ in range(CONFIG.confirm_frames + 3):
         t += 0.1
-        out = m.tick(blank(t, detection=seen(t), range_valid=False,
-                           in_workspace=True))
+        out = m.tick(blank(t, detection=seen(t), grasp_reachable=False,
+                           range_settled=True, in_workspace=True))
         assert out.state is State.CONFIRMING
 
 
-def test_a_range_outside_the_grasp_window_never_confirms():
+def test_a_target_still_being_crept_toward_never_confirms():
+    """Reachable but not settled: the base is still moving, so any grasp point
+    stored now is stale by however far it travels next."""
     m = confirming(StateMachine(CONFIG))
     t = 2.0
     for _ in range(CONFIG.confirm_frames + 3):
         t += 0.1
-        out = m.tick(blank(t, detection=seen(t), range_m=0.80,
-                           range_valid=True, in_workspace=True))
+        out = m.tick(blank(t, detection=seen(t), grasp_reachable=True,
+                           range_settled=False, in_workspace=True))
         assert out.state is State.CONFIRMING
 
 
@@ -190,13 +196,13 @@ def test_a_fallback_range_demands_more_frames():
     t = 2.0
     for _ in range(CONFIG.confirm_frames):
         t += 0.1
-        out = m.tick(blank(t, detection=seen(t, fallback=True), range_m=0.25,
-                           range_valid=True, in_workspace=True))
+        out = m.tick(blank(t, detection=seen(t, fallback=True), grasp_reachable=True,
+                           range_settled=True, in_workspace=True))
         assert out.state is State.CONFIRMING
     for _ in range(CONFIG.confirm_frames_fallback - CONFIG.confirm_frames):
         t += 0.1
-        out = m.tick(blank(t, detection=seen(t, fallback=True), range_m=0.25,
-                           range_valid=True, in_workspace=True))
+        out = m.tick(blank(t, detection=seen(t, fallback=True), grasp_reachable=True,
+                           range_settled=True, in_workspace=True))
     assert out.state is State.PICKING
 
 
@@ -215,8 +221,8 @@ def test_grasp_completion_stows_then_resumes_the_patrol():
     t = 2.0
     for _ in range(CONFIG.confirm_frames):
         t += 0.1
-        m.tick(blank(t, detection=seen(t), range_m=0.25,
-                     range_valid=True, in_workspace=True))
+        m.tick(blank(t, detection=seen(t), grasp_reachable=True,
+                     range_settled=True, in_workspace=True))
     assert m.state is State.PICKING
     out = m.tick(blank(t + 1.0, arm_sequence_done=True))
     assert out.state is State.STOWING

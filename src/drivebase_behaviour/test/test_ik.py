@@ -5,7 +5,11 @@ import subprocess
 
 import pytest
 
-from drivebase_behaviour.ik import JOINT_LIMITS, solve
+from drivebase_behaviour.ik import (
+    JOINT_LIMITS,
+    reachable_radius_band,
+    solve,
+)
 from drivebase_behaviour.kinematics import (
     extract_planar_arm,
     forward_kinematics,
@@ -238,3 +242,51 @@ def test_the_grasp_height_band_is_narrow_and_the_approach_is_forced(arm):
                  math.radians(d), JOINT_LIMITS) is not None
     ]
     assert angles and min(angles) <= -85 and max(angles) <= -80
+
+
+# The plane the coordinator actually grasps on: 50 mm above ground, not the
+# 35.4 mm of GRASP_Z. The 15 mm difference is the whole band - see
+# docs/arm_workspace.md on the window being a cliff rather than a gradient.
+CREEP_Z = 0.050 - 0.260
+
+
+def test_the_reachable_band_is_what_the_range_loop_creeps_toward(arm):
+    """Pins the band the coordinator scans at startup.
+
+    Not a requirement - a measurement. It is the setpoint of the range loop
+    and the gate the confirmation test applies, so a silent shift here moves
+    where the base parks without anything else complaining.
+    """
+    band = reachable_radius_band(
+        arm, CREEP_Z, -math.pi / 2, JOINT_LIMITS, clearance_height=0.060)
+    assert band is not None
+    low, high = band
+    assert 0.070 < low < 0.085
+    assert 0.190 < high < 0.210
+    # Wide enough for the 20 mm creep deadband to sit inside with margin.
+    assert high - low > 0.100
+
+
+def test_the_band_requires_the_descent_to_solve_too(arm):
+    """A radius the jaws can touch but cannot descend onto is not a grasp.
+
+    Raising the pre-grasp height can only narrow the band, never widen it,
+    because it adds a constraint rather than replacing one. That is the
+    property worth pinning: the scan cannot report a radius the grasp
+    sequence would then fail on.
+    """
+    flat = reachable_radius_band(
+        arm, CREEP_Z, -math.pi / 2, JOINT_LIMITS, clearance_height=0.0)
+    lifted = reachable_radius_band(
+        arm, CREEP_Z, -math.pi / 2, JOINT_LIMITS, clearance_height=0.120)
+    assert flat is not None and lifted is not None
+    assert lifted[0] >= flat[0] - 1e-9
+    assert lifted[1] <= flat[1] + 1e-9
+
+
+def test_an_unreachable_plane_has_no_band(arm):
+    """Below the arm entirely. Returning None rather than an empty or inverted
+    span is what lets the coordinator log and refuse instead of creeping to a
+    setpoint it computed from nothing."""
+    assert reachable_radius_band(
+        arm, CREEP_Z - 0.5, -math.pi / 2, JOINT_LIMITS) is None

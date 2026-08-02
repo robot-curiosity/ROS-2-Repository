@@ -45,24 +45,35 @@
     fallback_reference_height_px: 60.0
     fallback_reference_range_m: 1.0
 
-    # Grasp window, in CAMERA RANGE metres.
+    # THE RANGE LOOP. Creeps the base during CONFIRMING until the target sits
+    # in the middle of the radius span the arm can actually grasp at.
     #
-    # CAUTION - unit mismatch, flagged rather than hidden. docs/arm_workspace.md
-    # measures the usable ground-grasp span as 0.287 m to 0.481 m *from
-    # base_link along x*. The state machine compares these against the
-    # camera-to-target range, which is a different quantity. The values below
-    # are that window converted to camera range by scaling along the beam at the
-    # confirm pose, where a measured ToF of 0.2716 m corresponds to a ground
-    # intersection at x = 0.392 m:
-    #     0.287 / 0.392 * 0.2716 = 0.199
-    #     0.481 / 0.392 * 0.2716 = 0.333
-    # The scaling assumes the beam is straight and the ground flat, which is
-    # true here but makes these DERIVED, not measured. Verify in Task 16.
-    grasp_min: 0.199
-    grasp_max: 0.333
-    # Enter CONFIRMING a little before the target reaches the far edge of the
-    # window, so the gate has frames to work with. Must exceed grasp_max.
-    # NOTE: no longer used for the approach gate - see approach_bbox_height_min.
+    # There is no grasp window here any more, and that is the point. There used
+    # to be `grasp_min`/`grasp_max` in CAMERA RANGE metres, carrying a flagged
+    # unit mismatch: docs/arm_workspace.md measures the workspace from
+    # base_link, the gate compared it against camera-to-target range, and the
+    # two were reconciled by scaling along the beam at one pose. It never
+    # constrained the quantity that decides whether a grasp is possible.
+    # Measured cost: four targets confirmed in one run at grasp radii 0.200,
+    # 0.039, 0.015 and 0.070 m against a reachable band of 0.075-0.198.
+    #
+    # The gate is now the arm's own IK against the URDF - the same two solves
+    # the grasp sequence runs - and the band the base creeps toward is scanned
+    # from that same model at startup. Nothing to keep in sync, nothing to
+    # convert, and it follows the URDF if a link length changes.
+    creep_gain: 0.6              # m/s per metre of radius error
+    creep_max_speed: 0.08
+    # The base does not move below this; reversing especially, since it drags.
+    creep_min_speed: 0.03
+    # Half-width of the settled window. Must stay well inside half the band
+    # width, or the gate can never see a settled frame.
+    creep_deadband: 0.020
+    # Resolution of the startup radius scan. 2 mm against a band ~120 mm wide.
+    radius_scan_step: 0.002
+
+    # NOT USED. Superseded twice over - by approach_bbox_height_min for the
+    # approach gate, then by the IK reachability test for the grasp gate. Kept
+    # only so an existing params file does not fail to load.
     workspace_radius: 0.40
 
     # APPROACHING -> CONFIRMING gate: apparent bbox height as a fraction of
@@ -80,7 +91,10 @@
     # with fy = 493.79 and image_height = 480 (both read from CameraInfo) and
     # the test-field can 0.070 m tall:
     #     fraction = 0.0720 / d
-    # Targeting d = grasp_max = 0.333 m gives 0.216, rounded to 0.22.
+    # Targeting d = 0.333 m gives 0.216, rounded to 0.22. That 0.333 was the
+    # old camera-range grasp_max; the gate it fed is gone, but the number is
+    # still the right place to hand over - it is roughly where the target
+    # becomes close enough for the range loop to creep the rest of the way.
     #
     # TWO CAVEATS, both real:
     #
@@ -91,9 +105,9 @@
     #    gate is correct and the tracking is missing.
     # 2. The calibration is object-size specific. It assumes 0.070 m tall
     #    litter. Real litter varies, so this proxy degrades on anything much
-    #    larger or smaller. It gates the approach only - the ToF still has to
-    #    pass grasp_min..grasp_max inside CONFIRMING before anything is
-    #    grasped.
+    #    larger or smaller. It gates the approach only - inside CONFIRMING the
+    #    base still has to creep the target into the arm's reachable band and
+    #    the IK still has to solve it before anything is grasped.
     approach_bbox_height_min: 0.22
 
     # Timeouts. Every one of these falls back to resuming the patrol.

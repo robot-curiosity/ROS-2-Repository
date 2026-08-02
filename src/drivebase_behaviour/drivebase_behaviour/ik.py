@@ -109,6 +109,70 @@ def solve(
     return None
 
 
+def reachable_radius_band(
+    arm: PlanarArm,
+    z: float,
+    approach_angle: float,
+    limits: dict[str, tuple[float, float]],
+    clearance_height: float = 0.0,
+    r_min: float = 0.0,
+    r_max: float = 0.6,
+    step: float = 0.002,
+) -> tuple[float, float] | None:
+    """The widest contiguous span of planar radius that can be grasped at `z`.
+
+    Both the grasp point and the point `clearance_height` above it must solve.
+    A radius the jaws can touch but cannot descend onto vertically is not a
+    grasp: the descent is what the sequence actually executes, and admitting a
+    radius that only solves at the bottom means abandoning the piece after the
+    confirmation gate has already committed to it.
+
+    Returns (low, high) in the same `r` as `PlanarArm.to_planar`, or None if
+    nothing in [r_min, r_max] solves.
+
+    SCANNED, NOT SOLVED. The binding constraint changes across the span -
+    wrist_flex's limit at the near edge, the l1+l2 reach circle at the far one -
+    and a closed form would have to know which one bites where. A scan cannot
+    be wrong about that, and it runs once at startup.
+    """
+    best: tuple[float, float] | None = None
+    run_start: float | None = None
+    previous = r_min
+
+    steps = int((r_max - r_min) / step) + 1
+    for index in range(steps + 1):
+        # Sentinel pass at index == steps closes a run that reaches r_max.
+        r = r_min + index * step
+        ok = index < steps and _graspable(
+            arm, r, z, approach_angle, limits, clearance_height)
+
+        if ok and run_start is None:
+            run_start = r
+        elif not ok and run_start is not None:
+            if best is None or (previous - run_start) > (best[1] - best[0]):
+                best = (run_start, previous)
+            run_start = None
+        if ok:
+            previous = r
+
+    return best
+
+
+def _graspable(
+    arm: PlanarArm,
+    r: float,
+    z: float,
+    approach_angle: float,
+    limits: dict[str, tuple[float, float]],
+    clearance_height: float,
+) -> bool:
+    grasp = arm.from_planar(r, z)
+    if solve(arm, grasp, approach_angle, limits) is None:
+        return False
+    above = arm.from_planar(r, z + clearance_height)
+    return solve(arm, above, approach_angle, limits) is not None
+
+
 def _finish(
     arm: PlanarArm,
     wrist_r: float,

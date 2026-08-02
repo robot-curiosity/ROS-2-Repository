@@ -30,3 +30,9 @@ __pycache__/
 runs/shots/*.png
 runs/shots/mission/
 runs/shots/gz/
+
+# Diagnostic runs. The logs and raw frames behind a finding are large and
+# reproducible; the CSV summaries and any frame actually cited are not, and
+# those are tracked.
+runs/rangeloop*/
+runs/value_min/*.png

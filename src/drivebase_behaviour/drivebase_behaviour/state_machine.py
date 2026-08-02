@@ -29,8 +29,6 @@ class Config:
     deadband: float
     confirm_frames: int
     confirm_frames_fallback: int
-    grasp_min: float
-    grasp_max: float
     lost_timeout: float
     approach_timeout: float
     confirm_timeout: float
@@ -42,8 +40,12 @@ class Config:
 class Inputs:
     now: float
     detection: Detection | None
-    range_m: float
-    range_valid: bool
+    # Both come from the arm's own IK against the URDF, not from a distance
+    # window: `grasp_reachable` means the target AND the point above it solve,
+    # `range_settled` that the base has stopped creeping toward the middle of
+    # that reach. See Coordinator._creep.
+    grasp_reachable: bool
+    range_settled: bool
     in_workspace: bool
     nav_goal_active: bool
     nav_goal_succeeded: bool
@@ -163,11 +165,19 @@ class StateMachine:
             self._confirm_attempts = attempts
             return Outputs(state=self.state)
 
+        # Reachability, not a distance window. The old gate compared the
+        # camera-to-target range against a window converted from the arm's
+        # workspace by scaling along the beam, which is a different quantity
+        # measured from a different origin. It passed on four targets in one
+        # run whose grasp radii were 0.200, 0.039, 0.015 and 0.070 against a
+        # reachable band of 0.075-0.198 - so the gate committed to three pieces
+        # the arm could not reach and the IK then refused them, after the
+        # mission had already stopped for them.
         good = (
             self._usable(inputs)
             and abs(inputs.detection.horizontal_error) <= self.config.deadband
-            and inputs.range_valid
-            and self.config.grasp_min <= inputs.range_m <= self.config.grasp_max
+            and inputs.grasp_reachable
+            and inputs.range_settled
         )
 
         if not good:

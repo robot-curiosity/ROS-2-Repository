@@ -28,7 +28,11 @@ from sensor_msgs.msg import CameraInfo, Range
 
 from drivebase_behaviour.arm_driver import ArmDriver, grasp_sequence
 from drivebase_behaviour.detection_source import make_detection_source
-from drivebase_behaviour.ik import JOINT_LIMITS, solve
+from drivebase_behaviour.ik import (
+    JOINT_LIMITS,
+    reachable_radius_band,
+    solve,
+)
 from drivebase_behaviour.kinematics import extract_planar_arm, load_chain
 from drivebase_behaviour.localisation import (
     fallback_range_from_bbox,
@@ -58,8 +62,6 @@ class Coordinator(Node):
             deadband=self.p("deadband"),
             confirm_frames=int(self.p("confirm_frames")),
             confirm_frames_fallback=int(self.p("confirm_frames_fallback")),
-            grasp_min=self.p("grasp_min"),
-            grasp_max=self.p("grasp_max"),
             lost_timeout=self.p("lost_timeout"),
             approach_timeout=self.p("approach_timeout"),
             confirm_timeout=self.p("confirm_timeout"),
@@ -109,6 +111,9 @@ class Coordinator(Node):
         self._track_s = 0.0
         # Accumulated shoulder_pan while centring in CONFIRMING. See _aim_arm.
         self._aim_pan = 0.0
+        # Graspable radius span, scanned from the URDF once the mount height is
+        # known. Cached because it depends only on the arm and the grasp plane.
+        self._radius_band: tuple[float, float] | None = None
 
         self.arm.go_to(self._pose("search_pose"))
         self.machine.start()
@@ -141,11 +146,14 @@ class Coordinator(Node):
             "tof_max_range": 4.0,
             "fallback_reference_height_px": 60.0,
             "fallback_reference_range_m": 1.0,
-            # Camera-range window; see config/coordinator.yaml for the unit
-            # caveat behind these.
-            "grasp_min": 0.199,
-            "grasp_max": 0.333,
             "workspace_radius": 0.40,
+            # Range loop. Creeps the base until the target sits mid-reach;
+            # see config/coordinator.yaml and _creep.
+            "creep_gain": 0.6,
+            "creep_max_speed": 0.08,
+            "creep_min_speed": 0.03,
+            "creep_deadband": 0.020,
+            "radius_scan_step": 0.002,
             "approach_bbox_height_min": 0.22,
             "track_target_center_y": 0.5,
             "track_gain": 0.35,
@@ -285,10 +293,19 @@ class Coordinator(Node):
         self.arm.update(now)
 
         point, used_fallback = self._target_point()
-        range_m = (
+        camera_range = (
             math.sqrt(sum(c * c for c in point)) if point else float("nan")
         )
-        range_valid = point is not None
+
+        # Resolved only in CONFIRMING. The confirmation gate is the sole
+        # consumer and this costs a tf lookup plus two IK solves per tick;
+        # nothing in NAVIGATING or APPROACHING can use a grasp target.
+        confirming = self.machine.state is State.CONFIRMING
+        target, radius = (
+            self._grasp_target(point) if confirming
+            else (None, float("nan")))
+        grasp_reachable = self._grasp_solvable(target) if confirming else False
+        range_settled = self._settled(radius) if confirming else False
 
         detection = self.detections.latest
         if detection is not None and used_fallback:
@@ -310,8 +327,9 @@ class Coordinator(Node):
         # measurement that could not be taken until after it opened.
         #
         # A bbox that fills more of the frame means the target is nearer. It is
-        # a proxy, not a distance, and that is fine: range still has to pass
-        # grasp_min..grasp_max inside CONFIRMING before anything is grasped.
+        # a proxy, not a distance, and that is fine: CONFIRMING still has to
+        # creep the target into the arm's reachable band and solve the IK for
+        # it before anything is grasped.
         bbox_fraction = self._bbox_height_fraction(detection)
         # Close AND centred. Size alone is not enough: the base is what nulls
         # bearing, and leaving APPROACHING while still off-bearing hands the arm
@@ -333,8 +351,8 @@ class Coordinator(Node):
         outputs = self.machine.tick(Inputs(
             now=now,
             detection=detection,
-            range_m=range_m,
-            range_valid=range_valid,
+            grasp_reachable=grasp_reachable,
+            range_settled=range_settled,
             in_workspace=in_workspace,
             nav_goal_active=self.nav_goal_handle is not None,
             nav_goal_succeeded=self.nav_succeeded,
@@ -351,14 +369,15 @@ class Coordinator(Node):
         if outputs.state is not self._last_logged_state:
             self.get_logger().info(
                 f"{self._last_logged_state.value} -> {outputs.state.value} "
-                f"(range={range_m:.3f} valid={range_valid} "
+                f"(camera_range={camera_range:.3f} r={radius:.4f} "
+                f"reachable={grasp_reachable} settled={range_settled} "
                 f"bbox_frac={bbox_fraction:.4f} in_workspace={in_workspace})")
             self._last_logged_state = outputs.state
 
         if outputs.state is State.APPROACHING:
             self.get_logger().info(
                 f"approach: bbox_frac={bbox_fraction:.4f} "
-                f"range={range_m:.3f} track_s={self._track_s:.3f} "
+                f"camera_range={camera_range:.3f} track_s={self._track_s:.3f} "
                 f"cy={getattr(detection, 'center_y', float('nan')):.3f}",
                 throttle_duration_sec=1.0)
 
@@ -366,8 +385,8 @@ class Coordinator(Node):
             self._cancel_nav_goal()
         if outputs.send_next_waypoint:
             self._send_next_waypoint()
-        if outputs.store_grasp_point and point is not None:
-            self._store_and_grasp(point)
+        if outputs.store_grasp_point and target is not None:
+            self._store_and_grasp(target)
         if outputs.start_stow:
             self.arm.start_sequence(
                 [(self._pose("search_pose"), self.p("grasp_hold_seconds"))])
@@ -393,14 +412,19 @@ class Coordinator(Node):
         elif outputs.state is State.APPROACHING:
             self._servo(detection)
             self._track_target(detection)
-        elif outputs.state in (State.CONFIRMING, State.PICKING, State.STOWING):
+        elif outputs.state is State.CONFIRMING:
+            # Two loops, on two quantities the base and the arm each own
+            # exactly one of: the arm pans on bearing, the base creeps on
+            # radius. Neither can null the other's error, so they do not fight.
+            self._aim_arm(detection)
+            self._creep(radius)
+            self.get_logger().info(
+                f"confirm: r={radius:.4f} reachable={grasp_reachable} "
+                f"settled={range_settled} pan={self._aim_pan:.3f} "
+                f"err={getattr(detection, 'horizontal_error', float('nan')):.3f}",
+                throttle_duration_sec=1.0)
+        elif outputs.state in (State.PICKING, State.STOWING):
             self.cmd_publisher.publish(Twist())
-            if outputs.state is State.CONFIRMING:
-                self._aim_arm(detection)
-                self.get_logger().info(
-                    f"confirm: range={range_m:.3f} pan={self._aim_pan:.3f} "
-                    f"err={getattr(detection, 'horizontal_error', float('nan')):.3f}",
-                    throttle_duration_sec=1.0)
 
     # ---------- actions ----------------------------------------------------
 
@@ -516,6 +540,59 @@ class Coordinator(Node):
         pose["shoulder_pan"] = self._aim_pan
         self.arm.go_to(pose)
 
+    def _settled(self, radius: float) -> bool:
+        band = self._band()
+        if band is None or math.isnan(radius):
+            return False
+        centre = 0.5 * (band[0] + band[1])
+        return abs(radius - centre) <= self.p("creep_deadband")
+
+    def _creep(self, radius: float) -> None:
+        """Drive the base until the target sits mid-reach. THE RANGE LOOP.
+
+        Nothing used to null radius. The approach gate tested apparent size and
+        centring, neither of which constrains how far away the target is, so the
+        base stopped wherever it stopped and the arm was handed whatever radius
+        that left. Measured over one run: 0.200, 0.039, 0.015 and 0.070 m
+        against a band of 0.075-0.198 - two of them missing an edge by 2 mm and
+        5 mm, the other two not close.
+
+        CLOSED ON RADIUS IN METRES, not on vertical image error. The plan called
+        for the latter, creeping on `center_y` toward a calibrated setpoint. It
+        is the same information arriving less directly: the grasp target is
+        already computed every tick from the same ray x ToF product the grasp
+        itself uses, so its radius is observable outright. Going through image
+        space would add a pixels-per-metre calibration that holds only at one
+        camera pose and one object size, to recover a number already in hand.
+
+        Forward reduces radius: the target is fixed in the world, so closing on
+        it shortens the reach the arm needs. Reversing is not symmetric on this
+        base - it drags - which is what `creep_min_speed` is for.
+        """
+        command = Twist()
+        band = self._band()
+        if band is None or math.isnan(radius):
+            self.cmd_publisher.publish(command)
+            return
+
+        error = radius - 0.5 * (band[0] + band[1])
+        if abs(error) <= self.p("creep_deadband"):
+            # Stop INSIDE the deadband rather than easing toward it, so the
+            # frames the gate counts are taken with the base stationary. A
+            # grasp point stored while creeping is stale by however far the
+            # base travels during the arm's first move.
+            self.cmd_publisher.publish(command)
+            return
+
+        speed = self.p("creep_gain") * error
+        limit = self.p("creep_max_speed")
+        speed = max(-limit, min(limit, speed))
+        floor = self.p("creep_min_speed")
+        if abs(speed) < floor:
+            speed = math.copysign(floor, speed)
+        command.linear.x = speed
+        self.cmd_publisher.publish(command)
+
     def _grasp_plane_z(self) -> float | None:
         """Grasp height in arm_base_link, or None if the mount height is unknown.
 
@@ -543,12 +620,19 @@ class Coordinator(Node):
             return None
         return -mount.transform.translation.z + self.p("grasp_height")
 
-    def _store_and_grasp(self, point) -> None:
-        """Freeze the target in a static frame, then grasp open-loop.
+    def _grasp_target(self, point):
+        """The camera point as a grasp target in `arm_base_link`, plus radius.
 
-        Everything from here is blind: the jaws occlude the target and it is
-        inside the ToF's minimum range. See the design doc §6.
+        Returns (target, radius), or (None, nan) when tf is not available.
+
+        The radius is `PlanarArm`'s `r` - a signed projection measured from the
+        pan axis - and NOT `hypot(x, y)`. That is the coordinate both the IK and
+        the reachable band are expressed in, and the two differ by more than
+        rounding: the pan axis sits 38.8 mm off the base origin. See PlanarArm's
+        docstring.
         """
+        if point is None:
+            return None, float("nan")
         try:
             transform = self.tf_buffer.lookup_transform(
                 str(self.get_parameter("arm_base_frame").value),
@@ -556,9 +640,10 @@ class Coordinator(Node):
                 rclpy.time.Time(),
             )
         except tf2_ros.TransformException as error:
-            self.get_logger().warning(f"tf lookup failed, skipping grasp: {error}")
-            self.arm.start_sequence([])
-            return
+            self.get_logger().warning(
+                f"tf lookup failed, no grasp target: {error}",
+                throttle_duration_sec=2.0)
+            return None, float("nan")
 
         t = transform.transform.translation
         q = transform.transform.rotation
@@ -568,6 +653,68 @@ class Coordinator(Node):
         if grasp_plane is not None:
             target = (target[0], target[1], grasp_plane)
 
+        radius, _ = self.planar_arm.to_planar(
+            target, self.planar_arm.bearing(target))
+        return target, radius
+
+    def _grasp_solvable(self, target) -> bool:
+        """Whether the grasp the sequence would actually execute has a solution.
+
+        Both poses, because the descent is vertical: a target the jaws can touch
+        but cannot descend onto is not a grasp. This is the same pair of solves
+        `_store_and_grasp` runs, so the gate cannot pass something the grasp
+        then refuses.
+        """
+        if target is None:
+            return False
+        angle = self.p("approach_angle")
+        if solve(self.planar_arm, target, angle, JOINT_LIMITS) is None:
+            return False
+        above = (target[0], target[1],
+                 target[2] + self.p("grasp_approach_height"))
+        return solve(self.planar_arm, above, angle, JOINT_LIMITS) is not None
+
+    def _band(self) -> tuple[float, float] | None:
+        """The graspable radius span, scanned from the URDF on first use.
+
+        Deferred rather than computed in __init__ because it depends on the
+        grasp plane, which is measured down from the arm's mount height in tf -
+        and tf has nothing in it microseconds after the node starts.
+        """
+        if self._radius_band is not None:
+            return self._radius_band
+        grasp_plane = self._grasp_plane_z()
+        if grasp_plane is None:
+            return None
+
+        band = reachable_radius_band(
+            self.planar_arm,
+            grasp_plane,
+            self.p("approach_angle"),
+            JOINT_LIMITS,
+            clearance_height=self.p("grasp_approach_height"),
+            step=self.p("radius_scan_step"),
+        )
+        if band is None:
+            self.get_logger().error(
+                f"no graspable radius at z={grasp_plane:.4f} with a "
+                f"{self.p('grasp_approach_height'):.3f} m vertical approach; "
+                "the range loop has no target to creep to")
+            return None
+
+        self._radius_band = band
+        self.get_logger().info(
+            f"graspable radius band {band[0]:.4f}..{band[1]:.4f} m "
+            f"(centre {0.5 * (band[0] + band[1]):.4f}) at "
+            f"z={grasp_plane:.4f}")
+        return band
+
+    def _store_and_grasp(self, target) -> None:
+        """Grasp open-loop from here.
+
+        Everything from here is blind: the jaws occlude the target and it is
+        inside the ToF's minimum range. See the design doc §6.
+        """
         angle = self.p("approach_angle")
         solution = solve(self.planar_arm, target, angle, JOINT_LIMITS)
         if solution is None:
