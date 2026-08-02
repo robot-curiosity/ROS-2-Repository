@@ -37,8 +37,28 @@ class SimLitterDetector(Node):
         self.declare_parameter("min_area_fraction", 0.0004)
         # Red straddles the hue origin, so this range WRAPS when low > high:
         # see _hue_mask. The litter models are pure red (hue 0) and the field's
-        # barriers are orange (hue ~13 in OpenCV's 0-179 units), so the upper
-        # bound is what keeps the barriers out of the mask.
+        # barriers are orange (hue ~13 in OpenCV's 0-179 units).
+        #
+        # DO NOT RAISE `value_min` TO EXCLUDE THE BARRIERS. It was about to be,
+        # on the reasoning that a shaded barrier edge sampled at srgb(82,28,0)
+        # passes every bound (hue 10.2, saturation 255, value 82) and is dark
+        # only because it is shaded, so a threshold near 100 would drop it
+        # while leaving lit litter alone. Measured on live frames, that is
+        # wrong twice over - see scripts/measure_value_min.py:
+        #
+        # 1. THE LITTER IS NOT MUCH BRIGHTER. Of every pixel passing the hue
+        #    and saturation bounds in a frame with all three litter models in
+        #    view, the value floor is 97 and the 10th percentile is 100. A
+        #    threshold of 100 is already clipping litter; 120 empties the mask
+        #    and the detector goes blind, silently.
+        # 2. IT BUYS NOTHING. In that same frame the bounds admit 713 pixels
+        #    in exactly three blobs, centred on the three litter models, every
+        #    one at hue 0. The barriers contribute none. Hue is doing its job
+        #    here, and the sampled barrier corner was a shading condition, not
+        #    the steady state.
+        #
+        # Value has ~0 counts of margin to spend. If barrier edges do turn out
+        # to dominate a mask, the lever is shape or area, not brightness.
         self.declare_parameter("hue_low", 170)
         self.declare_parameter("hue_high", 10)
         self.declare_parameter("saturation_min", 120)
