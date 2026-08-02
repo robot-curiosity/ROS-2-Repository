@@ -395,7 +395,7 @@ Every figure the coordinator is calibrated on, and what it becomes:
 | Where | Value | At 260 mm | At 224 mm (FK) |
 |---|---|---|---|
 | `coordinator.yaml` `grasp_min` / `grasp_max` | camera range window | 0.199 / 0.333 | re-measure; FK band is 0.237–0.253 at a 12 mm grasp |
-| `coordinator.yaml` `grasp_height` | grasp plane | 0.050 | 0.012–0.020 becomes reachable |
+| `coordinator.yaml` `grasp_height` | grasp plane | 0.040 (was 0.050 until 2026-08-02) | 0.012–0.020 becomes reachable, with 114–142 mm of radial band — measured off the URDF, and the reason to take this section seriously |
 | `coordinator.yaml` `confirm_pose` | pose | `[0, 0.9, 0.46, −1.40, 0, 0]` | re-run `scripts/pod_aim_search.py` — the beam intercept moves 1.5 mm but the pose's *height* above the target changes by 36 mm |
 | `coordinator.yaml` `search_pose` | pose | `[0, −1.4, 0, 0.4, 0, 0]` | ToF ground intercept 1.064 m → 1.008 m |
 | `coordinator_node.py` `approach_bbox_height_min` | 0.22 | tuned at 260 mm | the pod rides 36 mm lower, so apparent size at a given range changes |
@@ -409,7 +409,7 @@ not editing geometry:
 1. Drop any `arm_mount_height:=0.224` from launch files and command lines. The
    default restores the built configuration; no URDF edit is involved.
 2. `coordinator.yaml` is the only other file that would carry adopted values.
-   Restore `grasp_height: 0.050`, `grasp_min: 0.199`, `grasp_max: 0.333` and
+   Restore `grasp_height: 0.040`, `grasp_min: 0.199`, `grasp_max: 0.333` and
    both poses from the table above.
 3. Re-run `bash scripts/dev-native.sh python scripts/verify_pod_orientation.py`
    and the 67 unit tests. Neither depends on mount height, so both passing after

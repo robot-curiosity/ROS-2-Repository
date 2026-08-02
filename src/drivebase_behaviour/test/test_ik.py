@@ -244,10 +244,10 @@ def test_the_grasp_height_band_is_narrow_and_the_approach_is_forced(arm):
     assert angles and min(angles) <= -85 and max(angles) <= -80
 
 
-# The plane the coordinator actually grasps on: 50 mm above ground, not the
-# 35.4 mm of GRASP_Z. The 15 mm difference is the whole band - see
+# The plane the coordinator actually grasps on: 40 mm above ground, not the
+# 35.4 mm of GRASP_Z. Those 4.6 mm are most of the band - see
 # docs/arm_workspace.md on the window being a cliff rather than a gradient.
-CREEP_Z = 0.050 - 0.260
+CREEP_Z = 0.040 - 0.260
 
 
 def test_the_reachable_band_is_what_the_range_loop_creeps_toward(arm):
@@ -261,10 +261,12 @@ def test_the_reachable_band_is_what_the_range_loop_creeps_toward(arm):
         arm, CREEP_Z, -math.pi / 2, JOINT_LIMITS, clearance_height=0.060)
     assert band is not None
     low, high = band
-    assert 0.070 < low < 0.085
-    assert 0.190 < high < 0.210
-    # Wide enough for the 20 mm creep deadband to sit inside with margin.
-    assert high - low > 0.100
+    assert 0.095 < low < 0.110
+    assert 0.165 < high < 0.180
+    # Wide enough for the 20 mm creep deadband to sit inside with margin. The
+    # bound dropped from 0.100 when the grasp plane came down from 50 mm to
+    # 40 mm to reach shorter litter; 70 mm is what that plane costs.
+    assert high - low > 0.065
 
 
 def test_the_band_requires_the_descent_to_solve_too(arm):

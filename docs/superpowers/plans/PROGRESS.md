@@ -66,6 +66,7 @@ Before this session's work, PICKING had never been reached at all.
 | **`shoulder_lift` has no headroom** | **Open, decision pending** — see `docs/arm_workspace.md` §7 |
 | **Gripper never opens as commanded** | **Fixed 2026-08-02** — the shared `p_gain` 4.0 against a constant ~1.2 N·m. `gripper_p_gain` is 40.0 and the joint now tracks to 0.035 rad. See below |
 | **The gripper has no opening to grip with** | **Open, and it is the real blocker** — the fixed jaw's collision box swallows the grasp point. Found 2026-08-02, after the gain fix produced two clean grasps and zero pickups |
+| **The jaws close above flat litter** | **Improved 2026-08-02, not fixed** — `grasp_height` 0.050 → 0.040, the lowest with a usable radial band. Reaches ~34 mm litter; the 24 mm wrapper needs the mount at 0.224 and no parameter substitutes. See below |
 | **Detector locks onto barrier edges** | **Resolved 2026-08-01 — `value_min` is not the lever.** Measured, not reasoned; see below |
 
 ### The range loop, 2026-08-01
@@ -201,6 +202,68 @@ Not one size is held at the grasp point:
 So the fix is the aim point, not the gripper and not the litter. Size is only
 free at the offset spot, where the full 33 mm can already fits.
 
+### Lowering the grasp plane, 2026-08-02 — as far as it goes, which is not far enough
+
+`grasp_height` is now **0.040**, down from 0.050, and it is also in
+`coordinator.yaml` rather than only in the node's defaults — it is the one knob
+that trades reachable band against how short a piece of litter can be gripped,
+and that depends on the field.
+
+**Two numbers decide it, and they were measured rather than argued.**
+
+- The jaws hang **6.4 mm** below `arm_gripper_frame_link` (7.3 mm at the widest
+  point of the gripper's travel), so at grasp height *g* the tips sit at
+  *g* − 6.4 mm and an object of height *h* is straddled only while
+  *g* < *h* + 6.4 mm. Off the collision meshes, in the pose the IK actually
+  solves — `verify_gripper_clearance.py` reports it.
+- The radial band the base has to be creeped into collapses as the plane drops.
+  Scanned over the URDF at 2 mm:
+
+| `grasp_height` | 0.036 | 0.038 | 0.040 | 0.044 | 0.050 | 0.060 |
+|---|---|---|---|---|---|---|
+| band width | 30 mm | 54 mm | **70 mm** | 94 mm | 122 mm | 154 mm |
+
+  The 20 mm creep deadband has to sit inside that, so **0.038 is the floor** and
+  0.040 is the lowest with anything to spare. The descent is not what binds:
+  the band is identical with `clearance_height` 0 and 0.060.
+
+**Driven, not just solved.** Both figures above are FK; the arm is held by P
+controllers and droops. Commanded to each plane in the simulator and read off
+tf `base_footprint` → `arm_gripper_frame_link`, twice each:
+
+| commanded | achieved | `shoulder_lift` |
+|---|---|---|
+| 0.050 | **0.0426** (7.4 mm low) | 1.609 commanded, +46 mrad |
+| 0.040 | **0.0351**, twice (4.9 mm low) | 1.699 commanded, **+46…+72 mrad — on the 1.74533 stop** |
+
+Droop runs *toward* the litter, so the jaws land lower than solved: tips at
+**28.7 mm**, not 33.6. But 0.0351 is also the arm's kinematic floor, and it is
+reached by saturating `shoulder_lift`. **Commanding below 0.040 therefore
+changes nothing at all** — the joint is already against its limit and the tip
+cannot follow. This is the "`shoulder_lift` has no headroom" blocker, arriving
+from a third direction.
+
+**What it buys, and what it does not.** Jaw tips come down from 43.6 mm to
+33.6 mm solved, 28.7 mm driven — so litter from ~44 mm tall down to ~29 mm
+becomes grippable. The 24 mm wrapper does not: it needs `grasp_height` under
+**0.031** against a floor of **0.038**, short by 6.7 mm solved and ~5 mm driven. **No value of `grasp_height` reaches it and no
+other software change does either** — it is the arm's reach, and
+`docs/arm_workspace.md` reached the same conclusion from the other side ("it
+cannot help the 12 mm wrapper at all. That is the whole argument for the
+bracket").
+
+**What does reach it: the mount.** At `arm_mount_height:=0.224` — already an
+argument, default 0.260, analysed in `docs/arm_workspace.md` — the same scan
+gives 114 mm of band at `grasp_height` 0.012 and 142 mm at 0.020, putting the
+jaw tips at 5.6 mm and 13.6 mm. A 24 mm wrapper is straddled with room either
+side. Not adopted: that document lists what has to be re-measured in sim first
+(`confirm_pose`, `search_pose`, `approach_bbox_height_min`, all of §1 and §3),
+and warns against pasting its FK figures in.
+
+Note this is orthogonal to the aim-point offset above. Both are needed: the
+grasp plane decides whether the jaws are *around* the litter rather than above
+it, and the offset decides whether they are around it rather than through it.
+
 The options as they were weighed, for the record — the jaw meshes are 1.44 MB
 (`wrist_roll_follower_so101_v1.stl`) and 1.41 MB (`moving_jaw_so101_v1.stl`),
 squarely inside the 0.5–2.6 MB range that decision cited, and
@@ -259,6 +322,14 @@ navigation log before reading anything into a run.**
 **1. Give the jaws an opening — see "The gripper has no opening" above.** This
 is the one thing between a converging pick and a pickup, and it needs a
 decision about collision geometry rather than an investigation.
+
+**2. Decide the mount height, which is what flat litter waits on.** Measured,
+not open: `grasp_height` is already at the floor the 260 mm mount allows and
+the 24 mm wrapper is 6.7 mm below what that reaches. `arm_mount_height:=0.224`
+clears it with 114–142 mm of radial band. The work is not the change — it is
+one launch argument — but the re-measurement `docs/arm_workspace.md` §5 lists:
+`confirm_pose` via `scripts/pod_aim_search.py`, `search_pose`,
+`approach_bbox_height_min`, and §1/§3 of that document.
 
 The item below is **done**; kept for the reasoning, which held up.
 
@@ -486,7 +557,10 @@ the workspace, where the radial window collapses:
 
 A 4.6 mm rise nearly quadruples the tolerance. Relaxing the approach angle does
 not substitute for it — the whole −90°…−87° range unions to 24 mm. The
-coordinator now grasps at **50 mm** (`grasp_height`), and takes that height from
+coordinator grasped at **50 mm** (`grasp_height`) from this finding until
+2026-08-02, when it came down to **40 mm** to reach shorter litter — see
+"Lowering the grasp plane" above for what that costs and what it still cannot
+reach. It takes that height from
 the **ground plane**, not from the ToF: the ToF is a single ray, at confirm_pose
 it lands beside the litter, and the point it yields sits on the ground (measured
 1.2 and 1.5 mm below it — the ground read to within its own noise). The ray

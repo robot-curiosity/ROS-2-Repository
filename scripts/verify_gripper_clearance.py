@@ -27,7 +27,10 @@ arm_gripper_link's frame:
 
   - where the grasp point (gripper_frame_link) sits relative to each jaw
   - the largest upright can that fits standing on the ground with the grasp
-    point 50 mm up its side, swept over the gripper's travel
+    point grasp_height up its side, swept over the gripper's travel
+  - how far the jaws hang below that point, which is what decides the
+    shortest litter they can close around rather than above
+  - which grasp heights hold which of the test field's litter, and where
   - the nearest spot that is actually graspable - free with the jaws open and
     trapped once they close, which free space alone does not imply
 
@@ -48,7 +51,16 @@ from urdf_parser_py.urdf import URDF
 REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO / "src" / "drivebase_behaviour"))
 
-from drivebase_behaviour.kinematics import _rpy_to_matrix  # noqa: E402
+from drivebase_behaviour.ik import (  # noqa: E402
+    JOINT_LIMITS,
+    reachable_radius_band,
+)
+from drivebase_behaviour.kinematics import (  # noqa: E402
+    _rpy_to_matrix,
+    extract_planar_arm,
+    forward_kinematics,
+    load_chain,
+)
 
 GRIPPER_LINK = "arm_gripper_link"
 MOVING_JAW_LINK = "arm_moving_jaw_so101_v1_link"
@@ -56,13 +68,14 @@ GRASP_FRAME_LINK = "arm_gripper_frame_link"
 GRIPPER_JOINT = "arm_gripper"
 
 # The can test_field.sdf spawns, and coordinator.yaml's grasp_height. The can
-# stands on the ground and the grasp point is 50 mm up its 70 mm side, so it
-# reaches 50 mm below that point and 20 mm above it - it is NOT centred there,
-# and a cylinder centred on the grasp point would model a can floating 15 mm
-# off the ground.
+# stands on the ground and the grasp point is grasp_height up its 70 mm side,
+# so it reaches that far below the point and the rest above it - it is NOT
+# centred there, and a cylinder centred on the grasp point would model a can
+# floating off the ground.
 CAN_RADIUS = 0.033
 CAN_HEIGHT = 0.070
-GRASP_HEIGHT = 0.050
+GRASP_HEIGHT = 0.040
+GRASP_APPROACH_HEIGHT = 0.060
 
 ANGLES = [0.0, 0.4, 0.8, 1.2, 1.6, 1.74533]
 
@@ -73,14 +86,14 @@ RAY_DIRECTIONS = [
 ]
 
 
-def load_urdf() -> URDF:
+def load_urdf() -> tuple[str, URDF]:
     xacro = subprocess.run(
         ["xacro", str(REPO / "src" / "drivebase_description" / "urdf"
                       / "drivebase.urdf.xacro"), "use_sim:=true",
          "use_arm:=true"],
         capture_output=True, text=True, check=True,
     )
-    return URDF.from_xml_string(xacro.stdout)
+    return xacro.stdout, URDF.from_xml_string(xacro.stdout)
 
 
 def load_stl(path: Path) -> np.ndarray:
@@ -117,6 +130,17 @@ class Solid:
 
     def contains(self, point: np.ndarray) -> bool:
         return self.local_contains(self.rotation.T @ (point - self.offset))
+
+    def bounds(self) -> tuple[np.ndarray, np.ndarray]:
+        """Axis-aligned bounds of this solid where it is placed.
+
+        Vertices bound a mesh and corners bound a box, so this never
+        under-reports - which is what lets `fits` discard a solid outright.
+        """
+        if getattr(self, "_bounds", None) is None:
+            points = self.points()
+            self._bounds = (points.min(axis=0), points.max(axis=0))
+        return self._bounds
 
     def points(self) -> np.ndarray:
         """Points of this solid, in the frame it is placed in.
@@ -227,6 +251,20 @@ def fits(radius: float, grasp: np.ndarray, axis: np.ndarray,
     nearly free and rejects almost everything, so it goes first.
     """
     low, high = -grasp_height, height - grasp_height
+
+    # Discard solids the object cannot touch at all. Sampling the wall costs a
+    # ray cast per triangle per point, and a search over offsets spends most of
+    # its time on positions nowhere near the jaws.
+    spread = radius * np.sqrt(np.maximum(0.0, 1.0 - axis * axis))
+    ends = np.array([grasp + low * axis, grasp + high * axis])
+    object_low, object_high = ends.min(axis=0) - spread, ends.max(axis=0) + spread
+    solids = [
+        s for s in solids
+        if np.all(s.bounds()[0] <= object_high) and np.all(s.bounds()[1] >= object_low)
+    ]
+    if not solids:
+        return True
+
     for solid in solids:
         points = solid.points() - grasp
         along = points @ axis
@@ -266,7 +304,7 @@ def largest_fitting(grasp, axis, solids) -> float:
 
 
 def main() -> int:
-    robot = load_urdf()
+    urdf, robot = load_urdf()
     links = {link.name: link for link in robot.links}
     joints = {joint.name: joint for joint in robot.joints}
 
@@ -318,20 +356,25 @@ def main() -> int:
             s.placed(jaw_rotation @ turn, jaw_origin) for s in moving_solids
         ]
 
-    sweep_object_sizes(grasp, axis, placed_at(OPEN_ANGLE),
-                       placed_at(CLOSED_ANGLE))
+    open_solids, closed_solids = placed_at(OPEN_ANGLE), placed_at(CLOSED_ANGLE)
+
+    below = jaw_reach_below(grasp, axis, open_solids, closed_solids)
+    sweep_object_sizes(grasp, axis, open_solids, closed_solids, below)
+
+    floor, band_width = lowest_reachable_grasp_height(urdf)
+    short_litter_ok = report_short_litter(below, floor)
+    print(f"  (that floor leaves a {band_width*1000:.0f} mm radial band.)")
 
     # Where the gap actually is, if it is not where the arm is aiming. The
     # coordinator drives gripper_frame_link to the target, so an opening
     # offset from that frame is a bias the grasp pose has to carry.
-    best = search_opening(grasp, axis, fixed_solids, moving_solids,
-                          jaw_rotation, jaw_origin, jaw_axis)
+    best = search_opening(grasp, axis, open_solids, closed_solids)
     if best is None:
         print("\nNo spot near the jaws holds the can with the jaws open and "
               "traps it when they close - the gripper cannot grasp it "
               "anywhere, not just at the grasp point.")
     else:
-        _, offset = best
+        offset = best
         print(f"\nNearest spot that IS graspable (fits at gripper "
               f"{OPEN_ANGLE}, trapped at {CLOSED_ANGLE}):")
         print(f"  dx {offset[0]:+.4f}  dy {offset[1]:+.4f} from the grasp "
@@ -339,6 +382,10 @@ def main() -> int:
 
     if widest < CAN_RADIUS:
         print("\nFAIL: the can does not fit at the point the arm aims at.")
+        return 1
+    if not short_litter_ok:
+        print("\nFAIL: some of the test field's litter is below the arm's "
+              "floor and no grasp height reaches it.")
         return 1
     print("\nOK: the jaws admit the can where the arm aims.")
     return 0
@@ -370,7 +417,8 @@ def graspable(radius, height, grasp, axis, open_solids, closed_solids,
                     height=height, grasp_height=grasp_height)
 
 
-def sweep_object_sizes(grasp, axis, open_solids, closed_solids) -> None:
+def sweep_object_sizes(grasp, axis, open_solids, closed_solids,
+                       below: float) -> None:
     """Whether a smaller object would be gripped at the point the arm aims."""
     print(f"\nAt the grasp point, by object size "
           f"(grasp_height {GRASP_HEIGHT}):")
@@ -380,30 +428,27 @@ def sweep_object_sizes(grasp, axis, open_solids, closed_solids) -> None:
         for height in OBJECT_HEIGHTS:
             held = graspable(radius, height, grasp, axis, open_solids,
                              closed_solids)
-            reaches = height > GRASP_HEIGHT
+            # The jaws hang `below` the aim frame, so what an object has to
+            # clear is the tips, not the grasp plane itself.
+            reaches = height > GRASP_HEIGHT - below
             cells.append("held" if held else
                          ("under" if not reaches else "no"))
         print(f"{radius:8.3f}" + "".join(f"{c:>10s}" for c in cells))
     print("  held  = fits open, trapped closed\n"
           "  no    = reaches the jaws but is not held\n"
-          "  under = shorter than grasp_height, so the jaws close above it")
+          f"  under = shorter than the {(GRASP_HEIGHT-below)*1000:.1f} mm the "
+          "jaw tips sit at, so the jaws close above it")
 
 
-def search_opening(grasp, axis, fixed_solids, moving_solids,
-                   jaw_rotation, jaw_origin, jaw_axis):
-    """The nearest spot the jaws could actually grasp a can at.
+def search_opening(grasp, axis, open_solids, closed_solids,
+                   radius=CAN_RADIUS, height=CAN_HEIGHT,
+                   grasp_height=GRASP_HEIGHT):
+    """The nearest spot the jaws could actually grasp this object at.
 
     Free space alone is not a grasp - the air beside the gripper is free too.
-    A graspable spot is one the can fits in with the jaws open and does NOT
+    A graspable spot is one the object fits in with the jaws open and does NOT
     fit in once they close, which is what "the jaws end up on it" means.
     """
-    def placed(angle):
-        turn = _axis_rotation(jaw_axis, angle)
-        return fixed_solids + [
-            s.placed(jaw_rotation @ turn, jaw_origin) for s in moving_solids
-        ]
-
-    open_solids, closed_solids = placed(OPEN_ANGLE), placed(CLOSED_ANGLE)
     steps = np.arange(-SEARCH_HALF_WIDTH, SEARCH_HALF_WIDTH + 1e-9,
                       SEARCH_STEP)
     best = None
@@ -413,15 +458,81 @@ def search_opening(grasp, axis, fixed_solids, moving_solids,
             if best is not None \
                     and np.linalg.norm(offset) >= np.linalg.norm(best):
                 continue
-            centre = grasp + offset
-            if not fits(CAN_RADIUS, centre, axis, open_solids, samples=36):
-                continue
-            if fits(CAN_RADIUS, centre, axis, closed_solids, samples=36):
-                continue        # the jaws close past it - nothing is gripped
-            best = offset
-    if best is None:
-        return None
-    return CAN_RADIUS, best
+            if graspable(radius, height, grasp + offset, axis, open_solids,
+                         closed_solids, grasp_height=grasp_height):
+                best = offset
+    return best
+
+
+def jaw_reach_below(grasp, axis, open_solids, closed_solids) -> float:
+    """How far the lowest jaw material sits below the grasp point.
+
+    This is what decides whether a low grasp is possible at all. The arm can
+    only bring `gripper_frame_link` down to a measured 35.4 mm (see
+    docs/arm_workspace.md), so an object shorter than that is only reachable
+    if the jaws themselves hang below the frame - and only until they hit the
+    ground.
+    """
+    return -min(
+        float(((solid.points() - grasp) @ axis).min())
+        for solid in open_solids + closed_solids
+    )
+
+
+# The two litter models in worlds/test_field.sdf. The wrapper is a
+# 80 x 50 x 24 mm box; 0.025 is the half-width the jaws would have to close
+# on, which is the dimension a cylinder stands in for here.
+OBJECTS = [("can 33x70", 0.033, 0.070), ("wrapper 25x24", 0.025, 0.024)]
+# Below this the radial band the base has to be creeped into collapses; the
+# 20 mm creep deadband needs somewhere to sit. Matches verify_grasp_band.py.
+MIN_BAND_WIDTH = 0.050
+
+
+def lowest_reachable_grasp_height(urdf: str) -> tuple[float, float]:
+    """The lowest grasp plane the base can still be positioned for.
+
+    Derived from the same URDF and the same band scan the coordinator runs at
+    startup, not from the workspace sweep's recorded 35.4 mm: that figure is
+    the arm's singular limit, where the band is 19 mm wide and no reachable
+    radius survives being creeped to.
+    """
+    arm = extract_planar_arm(
+        load_chain(urdf, "arm_base_link", "arm_gripper_frame_link"))
+    mount_z = float(forward_kinematics(
+        load_chain(urdf, "base_footprint", "arm_base_link"), {})[2, 3])
+    for millimetres in range(20, 81):
+        height = millimetres / 1000.0
+        band = reachable_radius_band(
+            arm, -mount_z + height, -math.pi / 2.0, JOINT_LIMITS,
+            clearance_height=GRASP_APPROACH_HEIGHT)
+        if band is not None and band[1] - band[0] >= MIN_BAND_WIDTH:
+            return height, band[1] - band[0]
+    sys.exit("no grasp height in 20-80 mm has a usable band")
+
+
+def report_short_litter(below: float, floor: float) -> bool:
+    """Which litter the jaws can close AROUND rather than above.
+
+    Two constraints meet here and they are the whole of the flat-litter
+    problem. The jaws reach `below` under the frame the arm aims, so at grasp
+    height g their tips sit at g - below and an object of height h is only
+    straddled when g < h + below. The arm cannot bring that frame lower than
+    `floor` with a band left to position the base in. An object with
+    h + below <= floor therefore cannot be gripped at any grasp height, and no
+    software change reaches it - the mount has to come down.
+    """
+    print(f"\nJaws reach {below*1000:.1f} mm below the aim frame; the lowest "
+          f"grasp plane with a usable band is {floor*1000:.1f} mm.")
+    print(f"{'object':>16s} {'needs grasp_height <':>21s} {'verdict':>30s}")
+    ok = True
+    for name, _, height in OBJECTS:
+        ceiling = height + below
+        reachable = ceiling > floor
+        ok &= reachable
+        verdict = (f"ok at {floor:.3f}..{ceiling:.3f}" if reachable
+                   else f"UNREACHABLE by {(floor - ceiling)*1000:.1f} mm")
+        print(f"{name:>16s} {ceiling:21.3f} {verdict:>30s}")
+    return ok
 
 
 def _axis_rotation(axis, angle: float) -> np.ndarray:

@@ -174,14 +174,27 @@ class Coordinator(Node):
             "stow_pose": [0.0, -1.20, 1.55, 1.10, 0.0, 0.0],
             "gripper_open": 1.2,
             "gripper_closed": 0.0,
+            # LOW ENOUGH FOR SHORT LITTER, and no lower than the workspace
+            # allows. The jaws' lowest material sits 6.4 mm under this frame,
+            # so the grasp plane is what decides the shortest object the jaws
+            # can close AROUND rather than above: 50 mm put the jaw tips at
+            # 43.6 mm and nothing under ~44 mm tall was ever gripped.
+            #
             # NOT the arm's lowest reachable height, which is 0.0354 m. That
             # figure sits on the singular edge of the workspace, where the
             # radial window at a straight-down approach is only 19 mm wide -
             # tighter than the base can be placed, and the reason no grasp was
-            # ever solvable. The window is a cliff, not a gradient: 40 mm gives
-            # 72 mm of it and 50 mm gives 123 mm. Relaxing the approach angle
-            # does not help - the whole -90..-87 deg range unions to 24 mm.
-            "grasp_height": 0.050,
+            # ever solvable. The window is a cliff, not a gradient: measured
+            # over the URDF, 36 mm gives 30 mm of band, 38 mm gives 54 mm,
+            # 40 mm gives 70 mm and 50 mm gives 122 mm. Relaxing the approach
+            # angle does not help - the whole -90..-87 deg range unions to
+            # 24 mm.
+            #
+            # 40 mm is the lowest with band to spare over the 20 mm creep
+            # deadband. It does NOT reach the 24 mm test-field wrapper: the
+            # jaw tips still land at 33.6 mm. Nothing in software does - see
+            # docs/arm_workspace.md on lowering the mount.
+            "grasp_height": 0.040,
             # How far straight up the jaws start from, in METRES. Was a 0.35
             # rad perturbation of shoulder_lift, which is not a height at all.
             # 60 mm clears a 70 mm can's rim and is solvable at every radius in
