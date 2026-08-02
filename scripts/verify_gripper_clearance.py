@@ -211,15 +211,22 @@ def solids_of(link, meshes_dir: Path) -> list[Solid]:
 
 
 def fits(radius: float, grasp: np.ndarray, axis: np.ndarray,
-         solids, samples: int = 72) -> bool:
-    """Does an upright can standing at `grasp` clear every solid?
+         solids, samples: int = 72, height: float = CAN_HEIGHT,
+         grasp_height: float = GRASP_HEIGHT) -> bool:
+    """Does an upright object standing on the ground clear every solid?
+
+    `grasp` is the point the arm drives to; the object stands on the ground
+    with that point `grasp_height` up its side, so it reaches from
+    -grasp_height to height-grasp_height along the axis. A short object is
+    entirely below the grasp point and clears everything trivially - which is
+    not the same as being grippable, see `graspable`.
 
     Both directions matter, and they catch different failures. A jaw standing
-    inside the can is caught by the jaw's own points; a jaw face the can's
-    wall passes through is caught by sampling the wall. The first is nearly
-    free and rejects almost everything, so it goes first.
+    inside the object is caught by the jaw's own points; a jaw face the
+    object's wall passes through is caught by sampling the wall. The first is
+    nearly free and rejects almost everything, so it goes first.
     """
-    low, high = -GRASP_HEIGHT, CAN_HEIGHT - GRASP_HEIGHT
+    low, high = -grasp_height, height - grasp_height
     for solid in solids:
         points = solid.points() - grasp
         along = points @ axis
@@ -238,7 +245,7 @@ def fits(radius: float, grasp: np.ndarray, axis: np.ndarray,
     for k in range(samples):
         theta = 2.0 * math.pi * k / samples
         radial_offset = radius * (math.cos(theta) * u + math.sin(theta) * v)
-        for h in np.linspace(low, high, 15):
+        for h in np.linspace(low, high, 15) if high > low else [low]:
             point = grasp + radial_offset + h * axis
             if any(s.contains(point) for s in solids):
                 return False
@@ -305,6 +312,15 @@ def main() -> int:
           "nothing of that size can be at the grasp point with the jaws where "
           "they are.")
 
+    def placed_at(angle):
+        turn = _axis_rotation(jaw_axis, angle)
+        return fixed_solids + [
+            s.placed(jaw_rotation @ turn, jaw_origin) for s in moving_solids
+        ]
+
+    sweep_object_sizes(grasp, axis, placed_at(OPEN_ANGLE),
+                       placed_at(CLOSED_ANGLE))
+
     # Where the gap actually is, if it is not where the arm is aiming. The
     # coordinator drives gripper_frame_link to the target, so an opening
     # offset from that frame is a bias the grasp pose has to carry.
@@ -333,6 +349,44 @@ OPEN_ANGLE = 1.2
 CLOSED_ANGLE = 0.0
 SEARCH_HALF_WIDTH = 0.06
 SEARCH_STEP = 0.005
+
+
+OBJECT_RADII = [0.005, 0.010, 0.015, 0.020, 0.025, 0.033]
+OBJECT_HEIGHTS = [0.024, 0.040, 0.070]
+
+
+def graspable(radius, height, grasp, axis, open_solids, closed_solids,
+              grasp_height=GRASP_HEIGHT) -> bool:
+    """Free with the jaws open, and caught once they close.
+
+    The second half is what separates a grasp from a near miss. An object the
+    jaws close straight past is not held, and an object entirely below them
+    clears everything precisely because they never touch it.
+    """
+    if not fits(radius, grasp, axis, open_solids, samples=36,
+                height=height, grasp_height=grasp_height):
+        return False
+    return not fits(radius, grasp, axis, closed_solids, samples=36,
+                    height=height, grasp_height=grasp_height)
+
+
+def sweep_object_sizes(grasp, axis, open_solids, closed_solids) -> None:
+    """Whether a smaller object would be gripped at the point the arm aims."""
+    print(f"\nAt the grasp point, by object size "
+          f"(grasp_height {GRASP_HEIGHT}):")
+    print(f"{'radius':>8s}" + "".join(f"{h:>10.3f}" for h in OBJECT_HEIGHTS))
+    for radius in OBJECT_RADII:
+        cells = []
+        for height in OBJECT_HEIGHTS:
+            held = graspable(radius, height, grasp, axis, open_solids,
+                             closed_solids)
+            reaches = height > GRASP_HEIGHT
+            cells.append("held" if held else
+                         ("under" if not reaches else "no"))
+        print(f"{radius:8.3f}" + "".join(f"{c:>10s}" for c in cells))
+    print("  held  = fits open, trapped closed\n"
+          "  no    = reaches the jaws but is not held\n"
+          "  under = shorter than grasp_height, so the jaws close above it")
 
 
 def search_opening(grasp, axis, fixed_solids, moving_solids,

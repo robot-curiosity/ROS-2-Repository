@@ -181,6 +181,26 @@ and that point is in the jaw rather than between the jaws. Not yet fixed; it is
 a question of which frame the grasp aims, and it moves numbers the whole
 `Measured figures` table is built on.
 
+**A smaller object does not help** — asked, and swept rather than reasoned.
+Not one size is held at the grasp point:
+
+| object radius | h = 0.024 | h = 0.040 | h = 0.070 |
+|---|---|---|---|
+| 0.005 → 0.033 | under | under | no |
+
+- **`no`** — tall enough to reach the jaws, still not held, at every radius
+  down to a 5 mm rod. Anything standing at the grasp point overlaps the jaw
+  material the grasp point is inside, and thinning it does not move it out.
+- **`under`** — shorter than `grasp_height`, so the jaws close 50 mm up, above
+  the object entirely. **This is `litter_wrapper`, which is 24 mm tall.** It is
+  a second, independent defect: `grasp_height` is a fixed 0.050 in
+  `coordinator.yaml`, so flat litter is never reached even with the jaws
+  working. The three mission targets are two 70 mm cans and one 24 mm wrapper,
+  and only the cans were ever in with a chance.
+
+So the fix is the aim point, not the gripper and not the litter. Size is only
+free at the offset spot, where the full 33 mm can already fits.
+
 The options as they were weighed, for the record — the jaw meshes are 1.44 MB
 (`wrist_roll_follower_so101_v1.stl`) and 1.41 MB (`moving_jaw_so101_v1.stl`),
 squarely inside the 0.5–2.6 MB range that decision cited, and
