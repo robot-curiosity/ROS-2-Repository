@@ -1,7 +1,9 @@
 # Behaviour coordinator — progress
 
 Resume point for `2026-07-30-behaviour-coordinator.md`.
-Last updated 2026-07-31. **Phases 1 and 2 complete. Next: Phase 3 (Task 11).**
+Last updated 2026-08-01. **Phases 1 and 2 complete. The mission runs end to end
+to PICKING with bearing and range both closed-loop. Next: the gripper never
+opens as commanded — see "Where the mission stands".**
 
 Branch: **`experimental/behaviour-coordinator`**, which is pushed and tracking
 `origin`. `master` is untouched. (This file said `feature/...` and "nothing
@@ -135,7 +137,50 @@ Launching navigation 20 s after the simulator reproduced it; 40 s, then 35 s
 more before the coordinator, did not. **Check `Managed nodes are active` in the
 navigation log before reading anything into a run.**
 
-Next, in order: the gripper opening; then the mount decision.
+### Next, in detail
+
+**1. The gripper never opens as commanded.** `gripper_open` is 1.200 and the
+joint reaches 0.937–1.088 across every pose, well inside the URDF limit of
+1.74533. It is the last thing between "3 entries to PICKING" and an actual
+pickup, and **no pickup has ever been verified** — the runs above prove the arm
+is aimed at the right point, not that it closes on anything.
+
+Not yet investigated, in the order worth trying:
+
+- **Read the joint back.** `/joint_states` orders joints alphabetically; confirm
+  which value is `arm_gripper` before concluding anything. Command 1.200 with
+  the mission stopped and watch the joint settle, so the reading is not confused
+  by a sequence step moving on underneath it.
+- **Suspect the gz `JointPositionController` gains, not the command.**
+  `gazebo.xacro`'s `arm_joint_hold` macro applies `p_gain 4.0`, `i_gain 0.05`,
+  `cmd_max 10.0` to all six joints uniformly. The gripper joint's `effort` is
+  10 and it is the smallest, lightest joint on the arm; a P term that holds the
+  shoulder against gravity is not obviously right for it. A steady-state offset
+  that scales with commanded angle is the signature of exactly this.
+- **Check for contact.** If the jaws are closing on the litter, the arm, or
+  themselves, the controller will hold short and report nothing. The collision
+  geometry is boxes, deliberately.
+- **Only then suspect the command path.** `arm_driver.go_to` clamps
+  `wrist_roll` and nothing else, so the gripper value reaches the publisher
+  unmodified; `grasp_sequence` passes `gripper_open` into three of five steps.
+
+The measurement worth having first is whether the shortfall is a fixed offset
+or a fixed ratio — command a sweep (0.4, 0.8, 1.2, 1.6) with the arm stationary
+and record what the joint reaches. That distinguishes a gain problem from a
+limit or a contact, and takes one run.
+
+**2. The mount decision.** `docs/arm_workspace.md` §7 measures the workspace at
+a 224 mm mount without adopting it; `shoulder_lift` has no headroom at the
+current 260 mm. This is a harness-routing and chassis call, **not one to make
+from the simulator** — the print may not have the bracket either way. It is
+recorded as pending on purpose.
+
+**3. Timestamp alignment, still not investigated.** The coordinator pairs the
+newest detection with the newest ToF and `CameraInfo` with no synchronisation.
+There is a staleness guard (`detection_stale_after`) but nothing aligns the
+three. It has not caused a visible failure yet, and now that the grasp target
+drives a control loop rather than a one-shot gate, a mismatched pair moves the
+base rather than just wasting a frame.
 
 ### Older, still open
 
