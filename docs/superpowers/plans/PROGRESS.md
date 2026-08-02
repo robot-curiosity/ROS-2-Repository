@@ -60,13 +60,82 @@ Before this session's work, PICKING had never been reached at all.
 | Aim loop integrated the wrong way | **Fixed** — `+=`, authority measured at −0.431 /rad |
 | Grasp height taken from a ToF that reads the ground | **Fixed** — ground plane datum, mount height from tf |
 | Pre-grasp raked 105 mm sideways through the litter | **Fixed** — both poses solved by IK, descent is vertical |
-| **Nothing nulls range** | **Open** — the base stops anywhere; grasp radii came out 0.200/0.039/0.015/0.070 against a band of 0.075–0.198 |
+| **Nothing nulls range** | **Fixed 2026-08-01** — the base creeps on radius during CONFIRMING and the gate asks the IK. See below |
 | **`shoulder_lift` has no headroom** | **Open, decision pending** — see `docs/arm_workspace.md` §7 |
 | **Gripper never opens as commanded** | **Open, cause unknown** — 1.200 commanded, 0.937–1.088 achieved across every pose, well inside its 1.745 limit |
-| **Detector locks onto barrier edges** | **Open, diagnosed** — see the `value_min` note under Task 11 |
+| **Detector locks onto barrier edges** | **Resolved 2026-08-01 — `value_min` is not the lever.** Measured, not reasoned; see below |
 
-Next, in order: the range loop (vertical image error → base creep, target
-+0.1862); then the gripper opening; then the mount decision.
+### The range loop, 2026-08-01
+
+Closed on **radius in metres**, not on vertical image error as planned. The
+coordinator already computes the grasp target every tick from the same ray ×
+ToF product the grasp uses, so radius is observable outright; routing it
+through `center_y` and a +0.1862 setpoint would have added a pixels-per-metre
+calibration valid at one camera pose and one object size to recover a number
+already in hand.
+
+`grasp_min`/`grasp_max` are **gone**. They compared camera range against a
+window converted from the workspace by scaling along the beam — the unit
+mismatch flagged in the config since it was written. The gate is now the same
+pair of IK solves the grasp sequence runs, so it cannot pass a target the grasp
+then refuses. The band the base creeps toward is scanned from the URDF at
+startup (`reachable_radius_band`), requiring both the grasp *and* the point
+above it to solve; `scripts/verify_grasp_band.py` reports it without a
+simulator.
+
+Measured, 200 s run on a real GPU:
+
+| | Before | After |
+|---|---|---|
+| Graspable band | 0.075–0.198, by hand | **0.0760–0.1980, scanned** |
+| Grasp radii | 0.200, 0.039, 0.015, 0.070 | **0.1528, 0.1187, 0.1499** |
+| Inside the band | none of four | **all three** |
+| `unreachable, abandoning` | 3 | **0** |
+| Confirmation settling | — | 1.5–3.2 s |
+
+The loop is visible in one sequence: r = 0.2133 (`reachable=False`, past the far
+edge) → 0.1709 → 0.1499, the base creeping 63 mm inward while the arm held
+`confirm_pose`. `runs/trace/approach.csv` traces the commands through
+`velocity_smoother` and `collision_monitor` to odom, including three **reverse**
+creep commands — the case that produced 0.039 and 0.015 and could never be
+corrected, because nothing backed the base up.
+
+**Pickups are still not verified.** The gripper-opening blocker is untouched.
+
+### `value_min` — measured, and the plan was wrong
+
+Raising it toward 100 to exclude shaded barrier edges fails twice over
+(`scripts/measure_value_min.py`, 194 frames, `runs/value_min/sweep.csv`):
+
+- **The litter is not much brighter.** Of every pixel passing the hue and
+  saturation bounds, the value floor is **97** and the 10th percentile is 100.
+  100 already clips litter; at 120 the mask empties and the detector reports
+  nothing in 0 of 194 frames, silently.
+- **It buys nothing.** Those bounds admit 713 pixels in exactly three blobs,
+  centred on the three litter models, all at hue 0. The barriers contribute
+  none. The sampled barrier corner was a shading condition, not the steady
+  state.
+
+Left at 60. If barrier edges do dominate a mask, the lever is shape or area,
+not brightness.
+
+### Give Nav2 time to come up, or the approach silently never closes
+
+Two of the three runs behind the numbers above failed for a reason that has
+nothing to do with the coordinator, and presents identically to a broken
+approach: **Nav2's lifecycle bringup stalls**, `behavior_server` logs `failed
+to send response to /behavior_server/change_state (timeout)`, and the manager
+never proceeds to `velocity_smoother` or `collision_monitor`. With no
+`velocity_smoother`, `/cmd_vel_nav` has no subscriber, and a volatile publisher
+with no subscriber discards silently — so the coordinator servos an approach
+that the base never executes, `bbox_frac` never grows, and every approach times
+out at 30 s.
+
+Launching navigation 20 s after the simulator reproduced it; 40 s, then 35 s
+more before the coordinator, did not. **Check `Managed nodes are active` in the
+navigation log before reading anything into a run.**
+
+Next, in order: the gripper opening; then the mount decision.
 
 ### Older, still open
 

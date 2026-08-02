@@ -21,7 +21,7 @@ reading code — figures quoted here have a measurement behind them.
 | Nav2 | Done — reaches goals, routes around obstacles |
 | Measurement rig | Done, produced the accuracy numbers |
 | Parts list | Done — `bom.md`, pack decision made, nothing ordered |
-| **Behaviour coordinator** | **In progress** — runs end to end to PICKING; grasp blocked on range control |
+| **Behaviour coordinator** | **In progress** — runs end to end to PICKING with range controlled; grasp blocked on the gripper never opening as commanded |
 | **Pico firmware** | **Not started** |
 | **Real sensor drivers** | **Not started** |
 | **Battery monitor** | **Not started** |
@@ -219,6 +219,7 @@ Every one of these failed **silently** — no error on either side.
 | Sweeping `wheel_mu2` changes nothing at all | dartsim takes one friction coefficient and ignores the `mu1`/`mu2` split. The lateral value is discarded on load, with no warning. See issue 1 |
 | Gazebo starts, no window ever opens, `create` loops "Requesting list of world names", `/clock` never published | gz-transport discovers peers over UDP multicast. Under `--net=host` on a host with no multicast route it finds nothing. Server and GUI processes both stay alive, so it does not look like a crash. `GZ_IP=127.0.0.1` — set in `scripts/dev.sh` |
 | Container GUI dies with "Authorization required, but no authorization protocol specified" | Xwayland authorises local clients by peer UID and a Hyprland session has no Xauthority file to forward. A root container is refused. The container must run as the host UID — `scripts/dev.sh` passes `--user` |
+| An approach never closes: the target's apparent size stops growing and every APPROACHING times out at 30 s | Nav2's lifecycle bringup stalled. `behavior_server` logs `failed to send response to /behavior_server/change_state (timeout)` and the manager never reaches `velocity_smoother`, so `/cmd_vel_nav` has no subscriber and a volatile publisher discards into nothing. Reproduced by launching navigation 20 s after the simulator; 40 s was enough. **Check `Managed nodes are active` before reading a run** |
 | `ros2 run` cannot find an executable that colcon clearly installed | The repo is on an NTFS/fuseblk mount that silently drops the executable bit, so console scripts install non-executable. `build/`, `install/`, `log/` are Docker volumes for this reason |
 
 ---
