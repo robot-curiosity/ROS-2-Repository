@@ -37,6 +37,13 @@ arm_gripper_link's frame:
     jaw swings through a wide arc and satisfies it while shoving the object
     past a fixed jaw it never touches
 
+"CLOSED" HERE MEANS THE JOINT'S LOWER STOP, -0.174533, and that matters more
+than it sounds. The coordinator commanded 0.0 until 2026-08-02, where the jaw
+faces still stand 15.8 mm apart at the tip and splay wider going up - a fixed
+V, not a pinch. Every conclusion this script reached before that was measured
+with the gripper half open, and reported "graspable nowhere" for objects that
+do have a window at the stop.
+
 Run it after touching the jaw geometry, grasp_height, or the gripper limits.
 It exits non-zero when the can does not fit where the arm aims, which is the
 state that produces a converging, confident, empty pick.
@@ -77,7 +84,7 @@ GRIPPER_JOINT = "arm_gripper"
 # floating off the ground.
 CAN_RADIUS = 0.033
 CAN_HEIGHT = 0.070
-GRASP_HEIGHT = 0.040
+GRASP_HEIGHT = 0.020
 GRASP_APPROACH_HEIGHT = 0.060
 
 ANGLES = [0.0, 0.4, 0.8, 1.2, 1.6, 1.74533]
@@ -417,7 +424,12 @@ def main() -> int:
 # old 1.2 because at 1.2 the moving jaw swings above the litter altogether,
 # so "open" stops meaning a wider gap and starts meaning no opposing jaw.
 OPEN_ANGLE = 1.0
-CLOSED_ANGLE = 0.0
+# Closed is the joint's own lower stop, not zero. At zero the jaws still
+# stand 15.8 mm apart at the tip and the pair reads as a permanently open V;
+# the last 0.175 rad of travel is the whole grip, taking that tip gap to
+# 1.9 mm. Everything this script concluded about what can be held was
+# measured with the gripper half open.
+CLOSED_ANGLE = JOINT_LIMITS["gripper"][0]
 SEARCH_HALF_WIDTH = 0.06
 SEARCH_STEP = 0.005
 
@@ -512,7 +524,8 @@ def search_opening(grasp, axis, open_solids, closed_solids,
 
 
 def grasp_window(grasp, axis, open_solids, closed_solids, radius, height,
-                 direction, span=0.09, step=0.002, fixed_solids=None):
+                 direction, span=0.09, step=0.002, fixed_solids=None,
+                 grasp_height=GRASP_HEIGHT):
     """The whole interval along `direction` that holds the object, not its edge.
 
     `search_opening` answers "is there anywhere" and returns the nearest such
@@ -524,7 +537,8 @@ def grasp_window(grasp, axis, open_solids, closed_solids, radius, height,
     held = [
         d for d in offsets
         if graspable(radius, height, grasp + d * direction, axis,
-                     open_solids, closed_solids, fixed_solids=fixed_solids)
+                     open_solids, closed_solids, grasp_height=grasp_height,
+                     fixed_solids=fixed_solids)
     ]
     if not held:
         return None

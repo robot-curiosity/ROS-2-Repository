@@ -193,9 +193,10 @@ def test_pan_points_at_the_target_bearing(arm):
         assert s.shoulder_pan == pytest.approx(pan, abs=1e-9)
 
 
-# Gripper height at the lowest measured pose, minus the mount height, both
-# from PROGRESS.md's workspace table. In `arm_base_link`, whose origin is the
-# mount, that is where litter sits.
+# The arm's reach floor, in `arm_base_link` - whose origin IS the mount, so
+# this is a property of the arm and does not move when the mount does. From
+# PROGRESS.md's workspace table: the lowest measured gripper pose was 35.4 mm
+# above ground with the mount at 260.
 GRASP_Z = 0.0354 - 0.260
 
 
@@ -244,13 +245,21 @@ def test_the_grasp_height_band_is_narrow_and_the_approach_is_forced(arm):
     assert angles and min(angles) <= -85 and max(angles) <= -80
 
 
-# The plane the coordinator actually grasps on: 40 mm above ground, not the
-# 35.4 mm of GRASP_Z. Those 4.6 mm are most of the band - see
-# docs/arm_workspace.md on the window being a cliff rather than a gradient.
-CREEP_Z = 0.040 - 0.260
+# coordinator.yaml's grasp_height. The mount comes from the URDF rather than a
+# second copy of the number: the plane the arm can reach sits a fixed distance
+# below the mount, so a mount change with a stale constant here would move the
+# band under a test that still claimed to pin it.
+GRASP_HEIGHT = 0.020
 
 
-def test_the_reachable_band_is_what_the_range_loop_creeps_toward(arm):
+@pytest.fixture(scope="module")
+def creep_z(urdf_xml):
+    mount_z = float(forward_kinematics(
+        load_chain(urdf_xml, "base_footprint", "arm_base_link"), {})[2, 3])
+    return GRASP_HEIGHT - mount_z
+
+
+def test_the_reachable_band_is_what_the_range_loop_creeps_toward(arm, creep_z):
     """Pins the band the coordinator scans at startup.
 
     Not a requirement - a measurement. It is the setpoint of the range loop
@@ -258,18 +267,19 @@ def test_the_reachable_band_is_what_the_range_loop_creeps_toward(arm):
     where the base parks without anything else complaining.
     """
     band = reachable_radius_band(
-        arm, CREEP_Z, -math.pi / 2, JOINT_LIMITS, clearance_height=0.060)
+        arm, creep_z, -math.pi / 2, JOINT_LIMITS, clearance_height=0.060)
     assert band is not None
     low, high = band
-    assert 0.095 < low < 0.110
-    assert 0.165 < high < 0.180
-    # Wide enough for the 20 mm creep deadband to sit inside with margin. The
-    # bound dropped from 0.100 when the grasp plane came down from 50 mm to
-    # 40 mm to reach shorter litter; 70 mm is what that plane costs.
-    assert high - low > 0.065
+    assert 0.060 < low < 0.075
+    assert 0.200 < high < 0.215
+    # Wide enough for the 20 mm creep deadband to sit inside with margin. It
+    # was 70 mm with the mount at 260 and the grasp plane at 40; dropping the
+    # mount to 224 buys both a lower plane AND twice the band, because the
+    # target stops sitting on the arm's reach floor.
+    assert high - low > 0.130
 
 
-def test_the_band_requires_the_descent_to_solve_too(arm):
+def test_the_band_requires_the_descent_to_solve_too(arm, creep_z):
     """A radius the jaws can touch but cannot descend onto is not a grasp.
 
     Raising the pre-grasp height can only narrow the band, never widen it,
@@ -278,17 +288,17 @@ def test_the_band_requires_the_descent_to_solve_too(arm):
     sequence would then fail on.
     """
     flat = reachable_radius_band(
-        arm, CREEP_Z, -math.pi / 2, JOINT_LIMITS, clearance_height=0.0)
+        arm, creep_z, -math.pi / 2, JOINT_LIMITS, clearance_height=0.0)
     lifted = reachable_radius_band(
-        arm, CREEP_Z, -math.pi / 2, JOINT_LIMITS, clearance_height=0.120)
+        arm, creep_z, -math.pi / 2, JOINT_LIMITS, clearance_height=0.120)
     assert flat is not None and lifted is not None
     assert lifted[0] >= flat[0] - 1e-9
     assert lifted[1] <= flat[1] + 1e-9
 
 
-def test_an_unreachable_plane_has_no_band(arm):
+def test_an_unreachable_plane_has_no_band(arm, creep_z):
     """Below the arm entirely. Returning None rather than an empty or inverted
     span is what lets the coordinator log and refuse instead of creeping to a
     setpoint it computed from nothing."""
     assert reachable_radius_band(
-        arm, CREEP_Z - 0.5, -math.pi / 2, JOINT_LIMITS) is None
+        arm, creep_z - 0.5, -math.pi / 2, JOINT_LIMITS) is None

@@ -38,7 +38,7 @@ from drivebase_behaviour.kinematics import (  # noqa: E402
 
 # Defaults from config/coordinator.yaml. Passed explicitly rather than parsed
 # so this script says what it assumed.
-GRASP_HEIGHT = 0.040
+GRASP_HEIGHT = 0.020
 GRASP_APPROACH_HEIGHT = 0.060
 APPROACH_ANGLE = -math.pi / 2.0
 # Narrower than this and the creep deadband has nowhere to sit.

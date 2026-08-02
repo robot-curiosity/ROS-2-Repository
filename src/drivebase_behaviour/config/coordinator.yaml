@@ -148,7 +148,13 @@
     # litter, so closing swept down onto the can rather than around it.
     # 1.0 clears the 66 mm can by 12.7 mm. 0.8 leaves 64.1 and clips it.
     gripper_open: 1.0
-    gripper_closed: 0.0
+    # The gripper joint's own LOWER STOP, from the URDF - not zero. At zero the
+    # jaws still stand 15.8 mm apart at the tip and only converge above that,
+    # so the pair sits as a permanently open V and closing on a can of any size
+    # pushes it out of the notch. The last 0.175 rad is the entire grip: it
+    # takes the tip gap to 1.9 mm. Everything measured before 2026-08-02 about
+    # what these jaws can hold was measured with them half open.
+    gripper_closed: -0.174533
     # Half the width of the litter being grasped. The grasp point is backed
     # off by this, because arm_gripper_frame_link sits on the fixed jaw's
     # face rather than between the jaws. 0.033 is the test field's can; the
@@ -158,9 +164,12 @@
     # in the node's defaults because it is the one knob that trades reachable
     # band against how short a piece of litter can be gripped, and the answer
     # depends on what the field actually holds. The jaws' lowest material is
-    # 6.4 mm below the frame this drives, so 0.040 puts the tips at 33.6 mm.
-    # Lower than 0.038 the radial band collapses; see coordinator_node.py.
-    grasp_height: 0.040
+    # 6.3 mm below the frame this drives, so 0.020 puts the tips at 13.7 mm -
+    # under the 24 mm wrapper by 10 mm, which is what makes it grippable at
+    # all rather than swept. Needs the 224 mm mount: at 260 the lowest plane
+    # with a usable band was 38 mm and nothing shorter than 32 mm was
+    # reachable at any height. Band here is 144 mm.
+    grasp_height: 0.020
     # Metres straight up from the grasp point, solved by IK as its own pose so
     # the descent is vertical. Was a 0.35 rad shoulder_lift perturbation, which
     # swung the tip 105 mm outward and raked the jaws through the litter.

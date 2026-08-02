@@ -42,16 +42,18 @@ from drivebase_behaviour.kinematics import (  # noqa: E402
 
 WORLD = "test_field"
 
-# Radii to try, in metres. The test field's cans are 0.033; the smaller ones
-# are here because the jaws that have to hold them are 12 mm across at the tip
-# and a cylinder much wider than the jaws rolls out of them.
-RADII = [0.033, 0.025, 0.020, 0.015, 0.010]
+# (radius, height) in metres. The test field's cans are 0.033 x 0.070; the
+# smaller radii are here because the jaws that have to hold them are 12 mm
+# across at the tip and a cylinder much wider than that rolls out of them.
+# The 0.024 heights are the wrapper's - the case the 224 mm mount exists for,
+# and the one that was under the jaws rather than between them at 260.
+PROBES = [(0.033, 0.070), (0.025, 0.070), (0.020, 0.070), (0.015, 0.070),
+          (0.010, 0.070), (0.025, 0.024), (0.015, 0.024)]
 
 # One radius per simulator session, because probes interact. Parking a probe
 # the jaws are still touching is silently refused by the solver - it stays put
 # - and the next probe is then placed inside it and both are flung metres.
 # Reproducible, and it corrupted exactly the sizes worth measuring.
-OBJECT_HEIGHT = 0.070
 OBJECT_MASS = 0.015
 
 URDF_XACRO = "/ws/src/drivebase_description/urdf/drivebase.urdf.xacro"
@@ -60,10 +62,10 @@ JOINTS = ["shoulder_pan", "shoulder_lift", "elbow_flex", "wrist_flex",
 
 # coordinator.yaml. Kept here rather than parsed so this script states what it
 # assumed and fails loudly if the file drifts away from it.
-GRASP_HEIGHT = 0.040
+GRASP_HEIGHT = 0.020
 GRASP_APPROACH_HEIGHT = 0.060
 GRIPPER_OPEN = 1.0
-GRIPPER_CLOSED = 0.0
+GRIPPER_CLOSED = JOINT_LIMITS["gripper"][0]
 APPROACH_ANGLE = -math.pi / 2.0
 
 # Gap between the fixed jaw's face and the object at placement. Not zero,
@@ -72,6 +74,8 @@ APPROACH_ANGLE = -math.pi / 2.0
 # and changed nothing: with more clearance the jaws simply close short.
 GRASP_CLEARANCE = 0.004
 SETTLE = 6.0
+# Waypoints down the 60 mm pre-grasp column, 10 mm apart.
+DESCENT_STEPS = 6
 LIFTED = 0.020          # metres above its resting height to count as picked
 
 
@@ -93,22 +97,22 @@ def can_pose(name: str) -> tuple[float, float, float]:
     return tuple(numbers[:3])
 
 
-def spawn(name: str, radius: float, x: float, y: float) -> None:
-    """An upright cylinder of the given radius, standing on the ground.
+def spawn(name: str, radius: float, height: float, x: float, y: float) -> None:
+    """An upright cylinder of the given size, standing on the ground.
 
-    Spawned rather than moved: the world's own cans are all 33 mm, and the
-    point of this sweep is the sizes it does not have.
+    Spawned rather than moved: the world's own cans are all 33 x 70 mm, and
+    the point of this sweep is the sizes it does not have.
     """
     sdf = (f'<?xml version="1.0"?><sdf version="1.9"><model name="{name}">'
-           f'<pose>{x} {y} {OBJECT_HEIGHT/2} 0 0 0</pose><link name="link">'
+           f'<pose>{x} {y} {height/2} 0 0 0</pose><link name="link">'
            f'<inertial><mass>{OBJECT_MASS}</mass><inertia>'
            f'<ixx>7e-6</ixx><iyy>7e-6</iyy><izz>4e-6</izz>'
            f'<ixy>0</ixy><ixz>0</ixz><iyz>0</iyz></inertia></inertial>'
            f'<collision name="c"><geometry><cylinder>'
-           f'<radius>{radius}</radius><length>{OBJECT_HEIGHT}</length>'
+           f'<radius>{radius}</radius><length>{height}</length>'
            f'</cylinder></geometry></collision>'
            f'<visual name="v"><geometry><cylinder>'
-           f'<radius>{radius}</radius><length>{OBJECT_HEIGHT}</length>'
+           f'<radius>{radius}</radius><length>{height}</length>'
            f'</cylinder></geometry></visual>'
            f'</link></model></sdf>')
     gz(["service", "-s", f"/world/{WORLD}/create",
@@ -116,7 +120,7 @@ def spawn(name: str, radius: float, x: float, y: float) -> None:
         "--timeout", "5000", "--req", f'sdf: \'{sdf}\''])
 
 
-def main(radii) -> int:
+def main(probes) -> int:
     urdf = subprocess.run(["xacro", URDF_XACRO, "use_sim:=true"],
                           check=True, capture_output=True, text=True).stdout
     arm = extract_planar_arm(
@@ -175,6 +179,24 @@ def main(radii) -> int:
             "gripper": gripper,
         })
 
+    def descend(gripper: float) -> None:
+        """Step the tip down the column instead of commanding the bottom.
+
+        Six P-controlled joints handed a single new setpoint do NOT move the
+        tip along the line between the two poses - each converges at its own
+        rate, so the tip bulges out of the column on the way. Measured: a
+        one-shot descent knocked a 50 mm disc 33 mm sideways and a 66 mm can
+        19 mm outward, both before the jaws closed at all.
+        """
+        for step in range(1, DESCENT_STEPS + 1):
+            height = GRASP_APPROACH_HEIGHT * (1.0 - step / DESCENT_STEPS)
+            at = solve(arm, (grasp[0], grasp[1], grasp[2] + height),
+                       APPROACH_ANGLE, JOINT_LIMITS)
+            if at is None:
+                sys.exit(f"no IK {height*1000:.0f} mm up the descent column")
+            command(at, gripper)
+            spin(SETTLE / DESCENT_STEPS + 0.5)
+
     spin(8.0)
 
     # Open, and go to the pre-grasp height. Where the jaws end up is read from
@@ -203,26 +225,28 @@ def main(radii) -> int:
     spin(SETTLE)
     high = buffer.lookup_transform("base_footprint", "arm_gripper_frame_link",
                                    rclpy.time.Time())
+    hx = high.transform.translation.x
     print(f"pre-grasp jaws at x {high.transform.translation.x:+.4f} "
           f"z {high.transform.translation.z:+.4f} "
           f"(x differs by {(high.transform.translation.x - jx)*1000:+.1f} mm)")
 
-    print(f"\n{'radius':>8s} {'descent nudge':>14s} {'rise':>9s} "
+    print(f"\n{'object':>13s} {'descent nudge':>14s} {'rise':>9s} "
           f"{'shove':>9s}  verdict")
     results = []
-    for index, radius in enumerate(RADII):
+    for index, (radius, height) in enumerate(probes):
         name = f"pickup_probe_{index}"
-        # ONE RADIUS BEYOND THE FRAME, plus GRASP_CLEARANCE: the frame is the
-        # fixed jaw's face, and the descent is not perfectly vertical - droop
-        # carries the tip 8.5 mm outward over the 60 mm drop - so an object
-        # touching that face on the way down is flicked away by it.
-        spawn(name, radius, jx + radius + GRASP_CLEARANCE, jy)
+        # ONE RADIUS BEYOND THE FRAME, plus GRASP_CLEARANCE - and beyond the
+        # OUTERMOST point of the descent, not the endpoint. Droop leaves the
+        # face several mm further out at pre-grasp than at the grasp, so
+        # clearing only the final position puts the object inside the column
+        # the face sweeps and the drop rakes it away before anything closes.
+        spawn(name, radius, height,
+              max(jx, hx) + radius + GRASP_CLEARANCE, jy)
         command(at_above, GRIPPER_OPEN)
         spin(SETTLE)
         placed = can_pose(name)
 
-        command(at_grasp, GRIPPER_OPEN)
-        spin(SETTLE)
+        descend(GRIPPER_OPEN)
         settled = can_pose(name)
         nudge = math.hypot(settled[0] - placed[0], settled[1] - placed[1])
 
@@ -240,9 +264,17 @@ def main(radii) -> int:
         verdict = ("LIFTED" if lifted_it else
                    "unreliable" if moved > 0.5 else
                    "shoved" if moved > 0.02 else "not touched")
-        print(f"{radius:8.3f} {nudge*1000:13.1f}m {rise*1000:8.1f}m "
+        print(f"{radius*2000:5.0f}x{height*1000:<7.0f} "
+              f"{nudge*1000:13.1f}m {rise*1000:8.1f}m "
               f"{moved*1000:8.1f}m  {verdict}")
-        results.append((radius, lifted_it))
+        # Which way it went, in the jaws' own frame: a push straight out
+        # along +x is the face raking it, a sideways one is the moving jaw.
+        print(f"          placed {(placed[0]-jx)*1000:+.1f},"
+              f"{(placed[1]-jy)*1000:+.1f} -> settled "
+              f"{(settled[0]-jx)*1000:+.1f},{(settled[1]-jy)*1000:+.1f}"
+              f" -> after {(after[0]-jx)*1000:+.1f},"
+              f"{(after[1]-jy)*1000:+.1f} mm from the jaws")
+        results.append((radius, height, lifted_it))
 
         command(at_above, GRIPPER_OPEN)
         spin(SETTLE)
@@ -250,15 +282,16 @@ def main(radii) -> int:
     node.destroy_node()
     rclpy.shutdown()
 
-    lifted = [r for r, ok in results if ok]
+    lifted = [(r, h) for r, h, ok in results if ok]
     if not lifted:
         print("\nFAIL: nothing was lifted at any size.")
         return 1
-    print(f"\nOK: lifted up to radius {max(lifted):.3f} m "
-          f"({max(lifted)*2000:.0f} mm across).")
+    print("\nOK, lifted: " + ", ".join(
+        f"{r*2000:.0f}x{h*1000:.0f} mm" for r, h in lifted))
     return 0
 
 
 if __name__ == "__main__":
-    chosen = [float(a) for a in sys.argv[1:]] or RADII
+    chosen = [tuple(float(v) for v in a.split(","))
+              for a in sys.argv[1:]] or PROBES
     sys.exit(main(chosen))

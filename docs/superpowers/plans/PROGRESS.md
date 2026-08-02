@@ -387,13 +387,22 @@ navigation log before reading anything into a run.**
 is the one thing between a converging pick and a pickup, and it needs a
 decision about collision geometry rather than an investigation.
 
-**2. Decide the mount height, which is what flat litter waits on.** Measured,
-not open: `grasp_height` is already at the floor the 260 mm mount allows and
-the 24 mm wrapper is 6.7 mm below what that reaches. `arm_mount_height:=0.224`
-clears it with 114–142 mm of radial band. The work is not the change — it is
-one launch argument — but the re-measurement `docs/arm_workspace.md` §5 lists:
-`confirm_pose` via `scripts/pod_aim_search.py`, `search_pose`,
-`approach_bbox_height_min`, and §1/§3 of that document.
+**2. The descent is not a descent.** Six P-controlled joints handed one new
+setpoint do not carry the tip along the line between the two poses — each
+converges at its own rate and the tip bulges out of the column. Measured at the
+224 mm mount, with the object placed clear of the *whole* swept column: a
+one-shot drop from 60 mm knocked a 50 × 24 mm disc **33 mm sideways** and a
+66 × 70 mm can **19 mm outward**, both before the gripper closed at all. The
+jaws then shut on nothing. This is now the whole of what stands between the
+geometry and a pickup. `scripts/verify_pickup.py` steps the tip down the column
+in 10 mm waypoints to test it; if that is what fixes it, `arm_driver.py`'s
+`grasp_sequence` needs the same treatment rather than two poses.
+
+**3. Re-measure what the mount drop invalidated.** The mount moved to 224 mm on
+2026-08-02 and the pod came down 36 mm with it, but the poses were not
+re-measured: `confirm_pose` via `scripts/pod_aim_search.py`, `search_pose`,
+`approach_bbox_height_min`, `grasp_min`/`grasp_max`, and §1/§3 of
+`docs/arm_workspace.md`. That document's §7 lists them.
 
 The item below is **done**; kept for the reasoning, which held up.
 
@@ -622,9 +631,15 @@ the workspace, where the radial window collapses:
 A 4.6 mm rise nearly quadruples the tolerance. Relaxing the approach angle does
 not substitute for it — the whole −90°…−87° range unions to 24 mm. The
 coordinator grasped at **50 mm** (`grasp_height`) from this finding until
-2026-08-02, when it came down to **40 mm** to reach shorter litter — see
-"Lowering the grasp plane" above for what that costs and what it still cannot
-reach. It takes that height from
+2026-08-02.
+
+**That table is the 260 mm mount, and the cliff is an artefact of it.** The
+window collapses because the target sits on the arm's reach floor, which is a
+fixed 222 mm below the mount wherever the mount is — so the cliff moves down
+with it. At 224 mm the same scan gives 104 mm of band at a 10 mm grasp, 142 at
+20 mm and 192 at 40 mm: the cliff is still there, but it is now below every
+height worth grasping at. `grasp_height` is **20 mm** as of 2026-08-02. It
+takes that height from
 the **ground plane**, not from the ToF: the ToF is a single ray, at confirm_pose
 it lands beside the litter, and the point it yields sits on the ground (measured
 1.2 and 1.5 mm below it — the ground read to within its own noise). The ray

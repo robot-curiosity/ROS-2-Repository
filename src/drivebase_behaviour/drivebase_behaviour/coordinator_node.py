@@ -181,7 +181,13 @@ class Coordinator(Node):
             # closing brought it down ONTO the can instead of around it.
             # 1.0 clears the 66 mm test can by 12.7 mm.
             "gripper_open": 1.0,
-            "gripper_closed": 0.0,
+            # THE JOINT'S LOWER STOP, NOT ZERO. ik.JOINT_LIMITS["gripper"]
+            # runs to -0.174533 and the whole grip lives in that last stretch:
+            # at 0.0 the jaw faces are still 15.8 mm apart at the tip and open
+            # wider going up, so the pair is a fixed V that a can rolls out of
+            # rather than a pinch. At the stop the tip gap is 1.9 mm. Closing
+            # to 0.0 is why every measured grasp shoved instead of held.
+            "gripper_closed": JOINT_LIMITS["gripper"][0],
             # NOT MEASURED FROM THE SCENE - the detector does not report a
             # size yet. This is the test field's can (0.066 m across) and it
             # is what the grasp point is backed off by; see _grasp_target.
@@ -189,26 +195,19 @@ class Coordinator(Node):
             # delete this.
             "grasp_object_radius": 0.033,
             # LOW ENOUGH FOR SHORT LITTER, and no lower than the workspace
-            # allows. The jaws' lowest material sits 6.4 mm under this frame,
+            # allows. The jaws' lowest material sits 6.3 mm under this frame,
             # so the grasp plane is what decides the shortest object the jaws
-            # can close AROUND rather than above: 50 mm put the jaw tips at
-            # 43.6 mm and nothing under ~44 mm tall was ever gripped.
+            # can close AROUND rather than above: at 40 mm the tips sat at
+            # 33.7 mm and every flat thing in the field passed underneath.
+            # 20 mm puts them at 13.7 mm, inside the 24 mm wrapper's height.
             #
-            # NOT the arm's lowest reachable height, which is 0.0354 m. That
-            # figure sits on the singular edge of the workspace, where the
-            # radial window at a straight-down approach is only 19 mm wide -
-            # tighter than the base can be placed, and the reason no grasp was
-            # ever solvable. The window is a cliff, not a gradient: measured
-            # over the URDF, 36 mm gives 30 mm of band, 38 mm gives 54 mm,
-            # 40 mm gives 70 mm and 50 mm gives 122 mm. Relaxing the approach
-            # angle does not help - the whole -90..-87 deg range unions to
-            # 24 mm.
-            #
-            # 40 mm is the lowest with band to spare over the 20 mm creep
-            # deadband. It does NOT reach the 24 mm test-field wrapper: the
-            # jaw tips still land at 33.6 mm. Nothing in software does - see
-            # docs/arm_workspace.md on lowering the mount.
-            "grasp_height": 0.040,
+            # THIS FIGURE DEPENDS ON THE MOUNT. The lowest plane with a
+            # workable radial band sits a fixed 222 mm below the mount, so at
+            # the old 260 mm it was 38 mm and no software value reached the
+            # wrapper. At 224 mm it is ~2 mm and 20 mm has 144 mm of band -
+            # well clear of the 20 mm creep deadband. Raise this with the
+            # mount if the mount ever goes back up.
+            "grasp_height": 0.020,
             # How far straight up the jaws start from, in METRES. Was a 0.35
             # rad perturbation of shoulder_lift, which is not a height at all.
             # 60 mm clears a 70 mm can's rim and is solvable at every radius in

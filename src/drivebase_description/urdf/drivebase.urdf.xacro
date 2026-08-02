@@ -254,17 +254,23 @@
 
        HEIGHT IS LOAD-BEARING, not cosmetic. Measured in simulation: the SO-101
        reaches 219 mm below its own mount (gripper 241 mm above ground when
-       mounted at 460 mm, elbow and wrist extended). Litter on the ground needs
-       the gripper near 30-40 mm, so the mount has to sit around 250-260 mm.
-       260 mm also clears the ultrasonic band at 200 mm by 17 mm once the base
-       link's own 87 mm height is accounted for.
+       mounted at 460 mm, elbow and wrist extended). On the top plane (460 mm)
+       the arm could not reach the ground at all.
 
-       On the top plane (460 mm) the arm could not reach the ground at all. -->
+       224 rather than the 260 it was built at. The floor the base can still be
+       positioned for sits a fixed 222 mm below the mount, so 260 put it at
+       38 mm - and the jaws hang only 6.3 mm below the frame the arm aims, so
+       at 38 mm they close 32 mm up in the air. Every flat thing in the test
+       field was under them, not between them. 224 brings that floor to ~2 mm
+       and widens the radial band the base is creeped into from 70 to 144 mm
+       at a 20 mm grasp.
+
+       215 mm is the hard stop: the arm base reaches 2.4 mm below its mount
+       and the ultrasonic band's top is at 210 mm. 224 keeps 24 mm of that. -->
   <!-- Height above GROUND, so the trade study reads in the units it is argued
-       in. Everything the coordinator is calibrated on was measured at 0.260 -
-       see docs/arm_workspace.md section 7 before changing it, which lists every
-       figure that moves and how to put them back. -->
-  <xacro:arg name="arm_mount_height" default="0.260"/>
+       in. See docs/arm_workspace.md section 7, which lists every figure that
+       moves with this and how to put them back. -->
+  <xacro:arg name="arm_mount_height" default="0.224"/>
   <xacro:property name="arm_mount_z"
                   value="${$(arg arm_mount_height) - wheel_radius}"/>
 
