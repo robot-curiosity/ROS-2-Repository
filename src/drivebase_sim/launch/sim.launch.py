@@ -62,13 +62,15 @@ def generate_launch_description() -> LaunchDescription:
     slip_lateral = LaunchConfiguration("slip_lateral")
     slip_longitudinal = LaunchConfiguration("slip_longitudinal")
     with_litter_detector = LaunchConfiguration("litter_detector")
+    gripper_p_gain = LaunchConfiguration("gripper_p_gain")
 
     robot_description = ParameterValue(
         Command(["xacro ", xacro_file, " use_sim:=true", " use_arm:=", use_arm,
                   " wheel_mu1:=", wheel_mu1, " wheel_mu2:=", wheel_mu2,
                   " wheel_slip:=", wheel_slip,
                   " slip_lateral:=", slip_lateral,
-                  " slip_longitudinal:=", slip_longitudinal]),
+                  " slip_longitudinal:=", slip_longitudinal,
+                  " gripper_p_gain:=", gripper_p_gain]),
         value_type=str,
     )
 
@@ -145,6 +147,13 @@ def generate_launch_description() -> LaunchDescription:
             "slip_longitudinal", default_value="0.0",
             description="Longitudinal slip compliance. Near zero keeps the "
                         "wheels gripping for drive.",
+        ),
+        DeclareLaunchArgument(
+            "gripper_p_gain", default_value="40.0",
+            description="Position gain for the gripper joint alone. The other "
+                        "five hold the arm against gravity and share 4.0, at "
+                        "which the gripper reached only 0.883 of a 1.200 "
+                        "command. Set 4.0 to restore the shared gain.",
         ),
         DeclareLaunchArgument(
             "litter_detector", default_value="true",

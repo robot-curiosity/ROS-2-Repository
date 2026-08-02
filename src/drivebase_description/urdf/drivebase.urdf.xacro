@@ -32,6 +32,22 @@
        figures. Lateral non-zero lets the tyres scrub during a point turn;
        longitudinal near zero keeps them gripping for drive. Exposed so the
        contact model stays sweepable the way wheel_mu1 is. -->
+  <!-- The gripper's position gain, separate from the five joints that carry the
+       arm's weight. Those share arm_joint_hold's 4.0, sized for a shoulder
+       holding the arm against gravity. At that gain the gripper tracked a 1.200
+       command to 0.883 with the rest of the arm still - the joint the mission
+       has to close on litter was the one joint the shared gain did not suit.
+
+       The joint carries a constant ~1.2 N.m opposing whichever way it is
+       moving, so the steady-state error is that torque over the gain and
+       nothing else: 0.317 rad at 4.0, 0.035 rad at 40.0, measured by
+       scripts/measure_gripper_sweep.py. 40.0 puts it inside 2 degrees within
+       one grasp_hold_seconds instead of 45 s of integrator crawl.
+
+       Revert with gripper_p_gain:=4.0; it is a sim plugin gain and does not
+       describe the hardware, where the STS3215 closes its own loop. -->
+  <xacro:arg name="gripper_p_gain" default="40.0"/>
+
   <xacro:arg name="wheel_slip" default="true"/>
   <xacro:arg name="slip_lateral" default="1.0"/>
   <xacro:arg name="slip_longitudinal" default="0.0"/>

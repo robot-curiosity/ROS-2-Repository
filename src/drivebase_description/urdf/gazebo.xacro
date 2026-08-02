@@ -107,14 +107,14 @@
        This is what the ~11 W idle arm draw in docs/power_budget.md pays for.
        ================================================================== -->
   <xacro:if value="${use_arm}">
-    <xacro:macro name="arm_joint_hold" params="joint target:=0">
+    <xacro:macro name="arm_joint_hold" params="joint target:=0 p_gain:=4.0">
       <gazebo>
         <plugin filename="gz-sim-joint-position-controller-system"
                 name="gz::sim::systems::JointPositionController">
           <joint_name>arm_${joint}</joint_name>
           <topic>/arm/${joint}/position</topic>
           <initial_position>${target}</initial_position>
-          <p_gain>4.0</p_gain>
+          <p_gain>${p_gain}</p_gain>
           <i_gain>0.05</i_gain>
           <d_gain>0.15</d_gain>
           <i_max>1.0</i_max>
@@ -139,7 +139,8 @@
     <xacro:arm_joint_hold joint="elbow_flex"    target="${stow_elbow_flex}"/>
     <xacro:arm_joint_hold joint="wrist_flex"    target="${stow_wrist_flex}"/>
     <xacro:arm_joint_hold joint="wrist_roll"    target="${stow_wrist_roll}"/>
-    <xacro:arm_joint_hold joint="gripper"       target="${stow_gripper}"/>
+    <xacro:arm_joint_hold joint="gripper"       target="${stow_gripper}"
+                          p_gain="$(arg gripper_p_gain)"/>
 
     <!-- ==================================================================
          SENSOR POD
