@@ -34,6 +34,26 @@ Then the probe, and optionally its friction:
 Size and shape are per SESSION, not per trial, because respawning is what
 corrupts a sweep. A sweep varies only what `set_pose` and the joint commands
 can vary.
+
+UNRESOLVED, AND THIS BENCH IS NOT TRUSTWORTHY UNTIL IT IS. The jaws finish
+progressively higher above the grasp plane on each successive trial of a
+session, and the curve is the same whatever the sweep varies:
+
+    steps disc     13.1  16.4  18.0  18.7  19.0  19.2 mm
+    yaw wrapper    13.3  16.8  18.3  18.9  19.1
+    repeat can     13.3  16.9  18.3  18.9
+
+That is the trial index, not the parameter - it asymptotes near 19 mm and
+nothing lifts past the first trial or two. Adding a settle at the bottom of
+the descent (which fixed a real and separate defect, see arm_driver) did not
+change it. Something accumulates across trials within one simulator session.
+Until that is found, every sweep here measures the drift.
+
+`verify_pickup.py` does NOT have this: it starts a fresh session per probe and
+lifts flat litter reliably. Trust it, not this, for whether a grasp works.
+Suspects not yet eliminated: the probe being re-posed while in contact, the
+arm never being commanded away from the grasp column between trials, and
+integrator windup in the six JointPositionControllers over a long session.
 """
 
 import math
