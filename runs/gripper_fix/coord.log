@@ -1,0 +1,150 @@
+[INFO] [launch]: All log files can be found below /home/dev/.ros/log/2026-08-02-04-17-30-596929-archlinux-453
+[INFO] [launch]: Default logging verbosity is set to INFO
+[INFO] [coordinator-1]: process started with pid [487]
+[coordinator-1] Unknown tag "hardwareInterface" in /robot[@name='drivebase']/transmission[@name='gripper_trans']/actuator[@name='motor6']
+[coordinator-1] Unknown tag "hardwareInterface" in /robot[@name='drivebase']/transmission[@name='wrist_roll_trans']/actuator[@name='motor5']
+[coordinator-1] Unknown tag "hardwareInterface" in /robot[@name='drivebase']/transmission[@name='wrist_flex_trans']/actuator[@name='motor4']
+[coordinator-1] Unknown tag "hardwareInterface" in /robot[@name='drivebase']/transmission[@name='elbow_flex_trans']/actuator[@name='motor3']
+[coordinator-1] Unknown tag "hardwareInterface" in /robot[@name='drivebase']/transmission[@name='shoulder_lift_trans']/actuator[@name='motor2']
+[coordinator-1] Unknown tag "hardwareInterface" in /robot[@name='drivebase']/transmission[@name='shoulder_pan_trans']/actuator[@name='motor1']
+[coordinator-1] [INFO] [1785644252.407799833] [behaviour_coordinator]: Coordinator started with 4 waypoints
+[coordinator-1] [INFO] [1785644252.413476381] [behaviour_coordinator]: idle -> navigating (camera_range=nan r=nan reachable=False settled=False bbox_frac=0.0000 in_workspace=False)
+[coordinator-1] [INFO] [1785644252.677240043] [behaviour_coordinator]: Waypoint 0: (2.0, 0.0)
+[coordinator-1] [INFO] [1785644253.846895370] [behaviour_coordinator]: navigating -> approaching (camera_range=2.443 r=nan reachable=False settled=False bbox_frac=0.0688 in_workspace=False)
+[coordinator-1] [INFO] [1785644253.848896524] [behaviour_coordinator]: approach: bbox_frac=0.0688 camera_range=2.443 track_s=0.000 cy=0.743
+[coordinator-1] [INFO] [1785644254.898375694] [behaviour_coordinator]: approach: bbox_frac=0.0896 camera_range=0.853 track_s=0.072 cy=0.170
+[coordinator-1] [INFO] [1785644256.021071197] [behaviour_coordinator]: approach: bbox_frac=0.0833 camera_range=2.203 track_s=0.046 cy=0.698
+[coordinator-1] [INFO] [1785644257.125476566] [behaviour_coordinator]: approach: bbox_frac=0.0000 camera_range=nan track_s=0.210 cy=0.000
+[coordinator-1] [INFO] [1785644258.149111852] [behaviour_coordinator]: approach: bbox_frac=0.1021 camera_range=0.940 track_s=0.082 cy=0.389
+[coordinator-1] [INFO] [1785644259.196682231] [behaviour_coordinator]: approach: bbox_frac=0.1271 camera_range=0.675 track_s=0.125 cy=0.176
+[coordinator-1] [INFO] [1785644260.255458058] [behaviour_coordinator]: approach: bbox_frac=0.1187 camera_range=0.770 track_s=0.017 cy=0.474
+[coordinator-1] [INFO] [1785644261.257856086] [behaviour_coordinator]: approach: bbox_frac=0.1542 camera_range=0.624 track_s=0.316 cy=0.331
+[coordinator-1] [INFO] [1785644262.327112567] [behaviour_coordinator]: approach: bbox_frac=0.1812 camera_range=0.536 track_s=0.375 cy=0.324
+[coordinator-1] [INFO] [1785644263.374442965] [behaviour_coordinator]: approach: bbox_frac=0.1792 camera_range=0.738 track_s=0.309 cy=0.846
+[coordinator-1] [INFO] [1785644264.519416534] [behaviour_coordinator]: approach: bbox_frac=0.1812 camera_range=0.454 track_s=0.308 cy=0.314
+[coordinator-1] [INFO] [1785644265.550111590] [behaviour_coordinator]: approach: bbox_frac=0.1021 camera_range=0.337 track_s=1.000 cy=0.949
+[coordinator-1] [INFO] [1785644265.847481727] [behaviour_coordinator]: approaching -> confirming (camera_range=0.270 r=nan reachable=False settled=False bbox_frac=0.3958 in_workspace=True)
+[coordinator-1] [INFO] [1785644265.851408474] [behaviour_coordinator]: graspable radius band 0.0760..0.1980 m (centre 0.1370) at z=-0.2100
+[coordinator-1] [INFO] [1785644265.853311273] [behaviour_coordinator]: confirm: r=nan reachable=False settled=False pan=-0.019 err=-0.019
+[coordinator-1] [INFO] [1785644266.886919148] [behaviour_coordinator]: confirm: r=0.0418 reachable=False settled=False pan=0.003 err=0.002
+[coordinator-1] [INFO] [1785644267.959737420] [behaviour_coordinator]: confirm: r=0.0661 reachable=False settled=False pan=0.009 err=-0.001
+[coordinator-1] [INFO] [1785644268.980282523] [behaviour_coordinator]: confirm: r=0.1174 reachable=True settled=True pan=0.006 err=0.000
+[coordinator-1] [INFO] [1785644269.259997741] [behaviour_coordinator]: confirming -> picking (camera_range=0.197 r=0.1189 reachable=True settled=True bbox_frac=0.3438 in_workspace=True)
+[coordinator-1] [INFO] [1785644278.436027444] [behaviour_coordinator]: picking -> stowing (camera_range=1.348 r=nan reachable=False settled=False bbox_frac=0.0500 in_workspace=False)
+[coordinator-1] [INFO] [1785644280.175669402] [behaviour_coordinator]: stowing -> navigating (camera_range=1.281 r=nan reachable=False settled=False bbox_frac=0.0500 in_workspace=False)
+[coordinator-1] [INFO] [1785644280.180599405] [behaviour_coordinator]: Waypoint 1: (4.0, 1.5)
+[coordinator-1] [INFO] [1785644280.282935224] [behaviour_coordinator]: navigating -> approaching (camera_range=1.280 r=nan reachable=False settled=False bbox_frac=0.0500 in_workspace=False)
+[coordinator-1] [INFO] [1785644280.284756069] [behaviour_coordinator]: approach: bbox_frac=0.0500 camera_range=1.280 track_s=0.000 cy=0.512
+[coordinator-1] [INFO] [1785644281.638302383] [behaviour_coordinator]: approach: bbox_frac=0.0563 camera_range=1.180 track_s=0.037 cy=0.507
+[coordinator-1] [INFO] [1785644282.688116763] [behaviour_coordinator]: approach: bbox_frac=0.0750 camera_range=1.032 track_s=0.087 cy=0.512
+[coordinator-1] [INFO] [1785644283.860322217] [behaviour_coordinator]: approach: bbox_frac=0.0979 camera_range=0.890 track_s=0.157 cy=0.526
+[coordinator-1] [INFO] [1785644284.925438471] [behaviour_coordinator]: approach: bbox_frac=0.1458 camera_range=0.788 track_s=0.210 cy=0.740
+[coordinator-1] [INFO] [1785644285.369825995] [behaviour_coordinator]: approaching -> confirming (camera_range=0.425 r=nan reachable=False settled=False bbox_frac=0.2625 in_workspace=True)
+[coordinator-1] [INFO] [1785644285.468897663] [behaviour_coordinator]: confirm: r=nan reachable=False settled=False pan=-0.086 err=-0.086
+[coordinator-1] [INFO] [1785644286.470101274] [behaviour_coordinator]: confirm: r=0.0842 reachable=True settled=False pan=1.513 err=-0.006
+[coordinator-1] [INFO] [1785644287.498515810] [behaviour_coordinator]: confirm: r=0.0938 reachable=True settled=False pan=1.273 err=-0.029
+[coordinator-1] [INFO] [1785644288.603735881] [behaviour_coordinator]: confirm: r=0.1194 reachable=True settled=True pan=1.042 err=-0.001
+[coordinator-1] [INFO] [1785644288.642927042] [behaviour_coordinator]: confirming -> picking (camera_range=0.191 r=0.1199 reachable=True settled=True bbox_frac=0.3458 in_workspace=True)
+[coordinator-1] [INFO] [1785644297.692873316] [behaviour_coordinator]: picking -> stowing (camera_range=1.321 r=nan reachable=False settled=False bbox_frac=0.1083 in_workspace=False)
+[coordinator-1] [INFO] [1785644299.542670141] [behaviour_coordinator]: stowing -> navigating (camera_range=1.294 r=nan reachable=False settled=False bbox_frac=0.1208 in_workspace=False)
+[coordinator-1] [INFO] [1785644299.544886370] [behaviour_coordinator]: Waypoint 2: (2.0, 3.0)
+[coordinator-1] [INFO] [1785644299.670043897] [behaviour_coordinator]: navigating -> approaching (camera_range=1.298 r=nan reachable=False settled=False bbox_frac=0.1208 in_workspace=False)
+[coordinator-1] [INFO] [1785644299.671502621] [behaviour_coordinator]: approach: bbox_frac=0.1208 camera_range=1.298 track_s=0.000 cy=0.940
+[coordinator-1] [INFO] [1785644300.832938156] [behaviour_coordinator]: approaching -> confirming (camera_range=0.488 r=nan reachable=False settled=False bbox_frac=0.2208 in_workspace=True)
+[coordinator-1] [INFO] [1785644300.835017267] [behaviour_coordinator]: confirm: r=nan reachable=False settled=False pan=-0.040 err=-0.040
+[coordinator-1] [INFO] [1785644301.960004400] [behaviour_coordinator]: confirm: r=0.2285 reachable=False settled=False pan=0.136 err=-0.044
+[coordinator-1] [INFO] [1785644303.175439641] [behaviour_coordinator]: confirm: r=0.1851 reachable=True settled=False pan=-0.114 err=-0.048
+[coordinator-1] [INFO] [1785644304.241098846] [behaviour_coordinator]: confirm: r=0.1535 reachable=True settled=True pan=-0.123 err=-0.001
+[coordinator-1] [INFO] [1785644304.454558574] [behaviour_coordinator]: confirming -> picking (camera_range=0.262 r=0.1531 reachable=True settled=True bbox_frac=0.4042 in_workspace=True)
+[coordinator-1] [INFO] [1785644313.340683673] [behaviour_coordinator]: picking -> stowing (camera_range=nan r=nan reachable=False settled=False bbox_frac=0.0000 in_workspace=False)
+[coordinator-1] [INFO] [1785644315.099321463] [behaviour_coordinator]: stowing -> navigating (camera_range=nan r=nan reachable=False settled=False bbox_frac=0.0000 in_workspace=False)
+[coordinator-1] [INFO] [1785644315.101623944] [behaviour_coordinator]: Waypoint 3: (0.0, 1.5)
+[coordinator-1] [INFO] [1785644334.076948472] [behaviour_coordinator]: Waypoint 0: (2.0, 0.0)
+[coordinator-1] [INFO] [1785644334.177642923] [behaviour_coordinator]: navigating -> approaching (camera_range=1.230 r=nan reachable=False settled=False bbox_frac=0.0250 in_workspace=False)
+[coordinator-1] [INFO] [1785644334.179236280] [behaviour_coordinator]: approach: bbox_frac=0.0250 camera_range=1.230 track_s=0.000 cy=0.317
+[coordinator-1] [INFO] [1785644335.253625176] [behaviour_coordinator]: approach: bbox_frac=0.0229 camera_range=1.227 track_s=0.000 cy=0.297
+[coordinator-1] [INFO] [1785644336.261527227] [behaviour_coordinator]: approach: bbox_frac=0.0250 camera_range=1.219 track_s=0.000 cy=0.298
+[coordinator-1] [INFO] [1785644337.447155329] [behaviour_coordinator]: approach: bbox_frac=0.0271 camera_range=1.225 track_s=0.000 cy=0.305
+[coordinator-1] [INFO] [1785644338.468092199] [behaviour_coordinator]: approach: bbox_frac=0.0292 camera_range=1.211 track_s=0.000 cy=0.323
+[coordinator-1] [INFO] [1785644339.482372398] [behaviour_coordinator]: approach: bbox_frac=0.0312 camera_range=1.211 track_s=0.000 cy=0.339
+[coordinator-1] [INFO] [1785644340.488021361] [behaviour_coordinator]: approach: bbox_frac=0.0333 camera_range=1.211 track_s=0.000 cy=0.358
+[coordinator-1] [INFO] [1785644341.608956733] [behaviour_coordinator]: approach: bbox_frac=0.0375 camera_range=1.216 track_s=0.000 cy=0.383
+[coordinator-1] [INFO] [1785644342.615144810] [behaviour_coordinator]: approach: bbox_frac=0.0417 camera_range=1.207 track_s=0.000 cy=0.417
+[coordinator-1] [INFO] [1785644343.695908237] [behaviour_coordinator]: approach: bbox_frac=0.0479 camera_range=1.198 track_s=0.000 cy=0.451
+[coordinator-1] [INFO] [1785644344.969303954] [behaviour_coordinator]: approach: bbox_frac=0.0542 camera_range=1.192 track_s=0.000 cy=0.490
+[coordinator-1] [INFO] [1785644346.118808216] [behaviour_coordinator]: approach: bbox_frac=0.0646 camera_range=1.090 track_s=0.034 cy=0.499
+[coordinator-1] [INFO] [1785644347.157165154] [behaviour_coordinator]: approach: bbox_frac=0.0771 camera_range=0.976 track_s=0.024 cy=0.474
+[coordinator-1] [INFO] [1785644348.270015087] [behaviour_coordinator]: approach: bbox_frac=0.0333 camera_range=3.616 track_s=0.096 cy=0.983
+[coordinator-1] [INFO] [1785644349.300789883] [behaviour_coordinator]: approach: bbox_frac=0.1000 camera_range=0.851 track_s=0.163 cy=0.506
+[coordinator-1] [INFO] [1785644350.357998061] [behaviour_coordinator]: approach: bbox_frac=0.1250 camera_range=0.632 track_s=0.161 cy=0.329
+[coordinator-1] [INFO] [1785644351.399274210] [behaviour_coordinator]: approach: bbox_frac=0.1521 camera_range=0.618 track_s=0.390 cy=0.468
+[coordinator-1] [INFO] [1785644352.561439638] [behaviour_coordinator]: approach: bbox_frac=0.1979 camera_range=0.491 track_s=0.488 cy=0.309
+[coordinator-1] [INFO] [1785644353.622494111] [behaviour_coordinator]: approach: bbox_frac=0.3104 camera_range=0.316 track_s=0.902 cy=0.264
+[coordinator-1] [INFO] [1785644354.684269421] [behaviour_coordinator]: approach: bbox_frac=0.2417 camera_range=0.255 track_s=1.000 cy=0.879
+[coordinator-1] [INFO] [1785644355.838609679] [behaviour_coordinator]: approach: bbox_frac=0.3250 camera_range=0.338 track_s=0.930 cy=0.492
+[coordinator-1] [INFO] [1785644356.922813978] [behaviour_coordinator]: approach: bbox_frac=0.1458 camera_range=0.305 track_s=0.895 cy=0.927
+[coordinator-1] [INFO] [1785644357.947779627] [behaviour_coordinator]: approach: bbox_frac=0.1479 camera_range=0.261 track_s=1.000 cy=0.926
+[coordinator-1] [INFO] [1785644359.023631364] [behaviour_coordinator]: approach: bbox_frac=0.1479 camera_range=0.268 track_s=1.000 cy=0.926
+[coordinator-1] [INFO] [1785644360.076770509] [behaviour_coordinator]: approach: bbox_frac=0.1458 camera_range=0.267 track_s=1.000 cy=0.927
+[coordinator-1] [INFO] [1785644361.161720781] [behaviour_coordinator]: approach: bbox_frac=0.1437 camera_range=0.267 track_s=1.000 cy=0.928
+[coordinator-1] [INFO] [1785644362.429569143] [behaviour_coordinator]: approach: bbox_frac=0.1437 camera_range=0.261 track_s=1.000 cy=0.928
+[coordinator-1] [INFO] [1785644363.485039623] [behaviour_coordinator]: approach: bbox_frac=0.1417 camera_range=0.266 track_s=1.000 cy=0.929
+[coordinator-1] [INFO] [1785644364.629865444] [behaviour_coordinator]: approach: bbox_frac=0.1396 camera_range=0.268 track_s=1.000 cy=0.930
+[coordinator-1] [INFO] [1785644365.639256576] [behaviour_coordinator]: approach: bbox_frac=0.1333 camera_range=0.260 track_s=1.000 cy=0.933
+[coordinator-1] [INFO] [1785644366.767897463] [behaviour_coordinator]: approach: bbox_frac=0.1313 camera_range=0.264 track_s=1.000 cy=0.934
+[coordinator-1] [INFO] [1785644367.798179231] [behaviour_coordinator]: approach: bbox_frac=0.1313 camera_range=0.266 track_s=1.000 cy=0.934
+[coordinator-1] [INFO] [1785644368.840482523] [behaviour_coordinator]: approach: bbox_frac=0.1292 camera_range=0.271 track_s=1.000 cy=0.935
+[coordinator-1] [INFO] [1785644368.847659693] [behaviour_coordinator]: approaching -> navigating (camera_range=0.260 r=nan reachable=False settled=False bbox_frac=0.1292 in_workspace=False)
+[coordinator-1] [INFO] [1785644368.850496379] [behaviour_coordinator]: Waypoint 1: (4.0, 1.5)
+[coordinator-1] [INFO] [1785644368.858918301] [behaviour_coordinator]: navigating -> approaching (camera_range=0.269 r=nan reachable=False settled=False bbox_frac=0.1292 in_workspace=False)
+[coordinator-1] [INFO] [1785644370.029584559] [behaviour_coordinator]: approach: bbox_frac=0.0000 camera_range=nan track_s=0.318 cy=0.000
+[coordinator-1] [INFO] [1785644371.066467104] [behaviour_coordinator]: approach: bbox_frac=0.0000 camera_range=nan track_s=0.318 cy=0.000
+[coordinator-1] [INFO] [1785644371.390928181] [behaviour_coordinator]: approaching -> navigating (camera_range=nan r=nan reachable=False settled=False bbox_frac=0.0000 in_workspace=False)
+[coordinator-1] [INFO] [1785644371.393030395] [behaviour_coordinator]: Waypoint 2: (2.0, 3.0)
+[coordinator-1] [INFO] [1785644390.128182747] [behaviour_coordinator]: Waypoint 3: (0.0, 1.5)
+[coordinator-1] [INFO] [1785644391.775470132] [behaviour_coordinator]: navigating -> approaching (camera_range=1.217 r=nan reachable=False settled=False bbox_frac=0.0458 in_workspace=False)
+[coordinator-1] [INFO] [1785644391.776969202] [behaviour_coordinator]: approach: bbox_frac=0.0458 camera_range=1.217 track_s=0.000 cy=0.275
+[coordinator-1] [INFO] [1785644392.783795269] [behaviour_coordinator]: approach: bbox_frac=0.0417 camera_range=1.222 track_s=0.000 cy=0.254
+[coordinator-1] [INFO] [1785644393.836822463] [behaviour_coordinator]: approach: bbox_frac=0.0417 camera_range=1.211 track_s=0.000 cy=0.258
+[coordinator-1] [INFO] [1785644394.879633499] [behaviour_coordinator]: approach: bbox_frac=0.0437 camera_range=1.215 track_s=0.000 cy=0.266
+[coordinator-1] [INFO] [1785644395.888905477] [behaviour_coordinator]: approach: bbox_frac=0.0458 camera_range=1.209 track_s=0.000 cy=0.275
+[coordinator-1] [INFO] [1785644397.007248373] [behaviour_coordinator]: approach: bbox_frac=0.0479 camera_range=1.203 track_s=0.000 cy=0.288
+[coordinator-1] [INFO] [1785644398.130977340] [behaviour_coordinator]: approach: bbox_frac=0.0521 camera_range=1.197 track_s=0.000 cy=0.309
+[coordinator-1] [INFO] [1785644399.213591748] [behaviour_coordinator]: approach: bbox_frac=0.0583 camera_range=1.196 track_s=0.000 cy=0.342
+[coordinator-1] [INFO] [1785644400.250620187] [behaviour_coordinator]: approach: bbox_frac=0.0625 camera_range=1.194 track_s=0.000 cy=0.375
+[coordinator-1] [INFO] [1785644401.293291682] [behaviour_coordinator]: approach: bbox_frac=0.0729 camera_range=1.189 track_s=0.000 cy=0.420
+[coordinator-1] [INFO] [1785644402.324541311] [behaviour_coordinator]: approach: bbox_frac=0.0833 camera_range=1.197 track_s=0.000 cy=0.481
+[coordinator-1] [INFO] [1785644403.354150985] [behaviour_coordinator]: approach: bbox_frac=0.0979 camera_range=1.035 track_s=0.033 cy=0.493
+[coordinator-1] [INFO] [1785644404.355762693] [behaviour_coordinator]: approach: bbox_frac=0.1208 camera_range=1.149 track_s=0.061 cy=0.683
+[coordinator-1] [INFO] [1785644405.373773980] [behaviour_coordinator]: approach: bbox_frac=0.1729 camera_range=1.049 track_s=0.375 cy=0.839
+[coordinator-1] [INFO] [1785644406.415392183] [behaviour_coordinator]: approach: bbox_frac=0.1771 camera_range=0.549 track_s=0.408 cy=0.657
+[coordinator-1] [INFO] [1785644407.231062618] [behaviour_coordinator]: approaching -> confirming (camera_range=0.352 r=nan reachable=False settled=False bbox_frac=0.2771 in_workspace=True)
+[coordinator-1] [INFO] [1785644407.233588469] [behaviour_coordinator]: confirm: r=nan reachable=False settled=False pan=0.067 err=0.067
+[coordinator-1] [INFO] [1785644408.430494145] [behaviour_coordinator]: confirm: r=0.1214 reachable=True settled=True pan=0.192 err=-0.004
+[coordinator-1] [INFO] [1785644408.632055993] [behaviour_coordinator]: confirming -> picking (camera_range=0.184 r=0.1236 reachable=True settled=True bbox_frac=0.3417 in_workspace=True)
+[coordinator-1] [INFO] [1785644418.135398769] [behaviour_coordinator]: picking -> stowing (camera_range=nan r=nan reachable=False settled=False bbox_frac=0.0000 in_workspace=False)
+[coordinator-1] [INFO] [1785644419.771330142] [behaviour_coordinator]: stowing -> navigating (camera_range=nan r=nan reachable=False settled=False bbox_frac=0.0000 in_workspace=False)
+[coordinator-1] [INFO] [1785644419.773694770] [behaviour_coordinator]: Waypoint 0: (2.0, 0.0)
+[coordinator-1] [INFO] [1785644421.320955190] [behaviour_coordinator]: navigating -> approaching (camera_range=1.205 r=nan reachable=False settled=False bbox_frac=0.0354 in_workspace=False)
+[coordinator-1] [INFO] [1785644421.322328473] [behaviour_coordinator]: approach: bbox_frac=0.0354 camera_range=1.205 track_s=0.000 cy=0.203
+[coordinator-1] [INFO] [1785644422.480673214] [behaviour_coordinator]: approach: bbox_frac=0.0312 camera_range=1.215 track_s=0.000 cy=0.189
+[coordinator-1] [INFO] [1785644423.611676174] [behaviour_coordinator]: approach: bbox_frac=0.0333 camera_range=1.201 track_s=0.000 cy=0.192
+[coordinator-1] [INFO] [1785644424.613477629] [behaviour_coordinator]: approach: bbox_frac=0.0354 camera_range=1.201 track_s=0.000 cy=0.203
+[coordinator-1] [INFO] [1785644425.656453947] [behaviour_coordinator]: approach: bbox_frac=0.0375 camera_range=1.193 track_s=0.000 cy=0.223
+[coordinator-1] [INFO] [1785644426.669257097] [behaviour_coordinator]: approach: bbox_frac=0.0417 camera_range=1.181 track_s=0.000 cy=0.242
+[coordinator-1] [INFO] [1785644428.053784318] [behaviour_coordinator]: approach: bbox_frac=0.0458 camera_range=1.186 track_s=0.000 cy=0.267
+[coordinator-1] [INFO] [1785644429.177334969] [behaviour_coordinator]: approach: bbox_frac=0.0521 camera_range=1.176 track_s=0.000 cy=0.307
+[coordinator-1] [INFO] [1785644430.212140036] [behaviour_coordinator]: approach: bbox_frac=0.0604 camera_range=1.177 track_s=0.000 cy=0.351
+[coordinator-1] [INFO] [1785644431.349213395] [behaviour_coordinator]: approach: bbox_frac=0.0688 camera_range=1.173 track_s=0.000 cy=0.405
+[coordinator-1] [INFO] [1785644432.476723314] [behaviour_coordinator]: approach: bbox_frac=0.0854 camera_range=1.078 track_s=0.000 cy=0.495
+[coordinator-1] [INFO] [1785644433.547693068] [behaviour_coordinator]: approach: bbox_frac=0.1042 camera_range=0.888 track_s=0.033 cy=0.512
+[coordinator-1] [INFO] [1785644434.559894046] [behaviour_coordinator]: approach: bbox_frac=0.1333 camera_range=1.039 track_s=0.143 cy=0.671
+[coordinator-1] [INFO] [1785644435.802315529] [behaviour_coordinator]: approach: bbox_frac=0.1896 camera_range=0.485 track_s=0.424 cy=0.397
+[coordinator-1] [INFO] [1785644436.371074341] [behaviour_coordinator]: approaching -> confirming (camera_range=0.375 r=nan reachable=False settled=False bbox_frac=0.2417 in_workspace=True)
+[coordinator-1] [INFO] [1785644436.373436655] [behaviour_coordinator]: confirm: r=nan reachable=False settled=False pan=0.000 err=0.000
+[coordinator-1] [INFO] [1785644437.259215216] [behaviour_coordinator]: confirming -> picking (camera_range=0.193 r=0.1272 reachable=True settled=True bbox_frac=0.3458 in_workspace=True)
+[coordinator-1] [INFO] [1785644446.345696103] [behaviour_coordinator]: picking -> stowing (camera_range=nan r=nan reachable=False settled=False bbox_frac=0.0000 in_workspace=False)
+[coordinator-1] [INFO] [1785644448.250092513] [behaviour_coordinator]: stowing -> navigating (camera_range=nan r=nan reachable=False settled=False bbox_frac=0.0000 in_workspace=False)
+[coordinator-1] [INFO] [1785644448.252426773] [behaviour_coordinator]: Waypoint 1: (4.0, 1.5)
+[coordinator-1] [INFO] [1785644769.371951533] [behaviour_coordinator]: Waypoint 2: (2.0, 3.0)
+[coordinator-1] [INFO] [1785645082.674458810] [behaviour_coordinator]: Waypoint 3: (0.0, 1.5)

@@ -188,12 +188,20 @@ class Rig:
         return t.translation.x, t.translation.y, t.translation.z
 
     def descend(self, steps: int, gripper: float) -> None:
+        """Down the column, then STOP before anything closes on anything.
+
+        The dwell at each waypoint is a floor, not a share of a budget - at
+        eight steps a proportional dwell is under a second and the arm never
+        arrives. The bottom then gets settled properly, because that is where
+        the grip happens and the jaws must not still be moving when they shut.
+        Measured without it: the descent bottom sat 12.6 mm above the plane at
+        one waypoint and 17.3 mm at three, purely because the per-waypoint
+        dwell shrank - the jaws were closing on the way down.
+        """
         for step in range(1, steps + 1):
             self.at(GRASP_APPROACH_HEIGHT * (1.0 - step / steps), gripper)
-            # A floor per waypoint, not just a share of the budget: at eight
-            # steps a proportional dwell is under a second and the arm never
-            # arrives at any of them.
             self.spin(max(1.5, SETTLE / steps))
+        self.settled_at(0.0, gripper)
 
     def settled_at(self, height: float, gripper: float) -> tuple:
         """Command a height and wait until the jaws stop moving.

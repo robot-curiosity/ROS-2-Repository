@@ -88,6 +88,7 @@ def grasp_sequence(
     gripper_open: float,
     gripper_closed: float,
     hold_seconds: float,
+    settle_seconds: float,
 ) -> list[tuple[dict[str, float], float]]:
     """Descend vertically onto the target, close, lift vertically, return.
 
@@ -112,6 +113,13 @@ def grasp_sequence(
     OUTWARD, a diagonal rake that launched a 15 g can 1.6 m. Same failure,
     twenty times the size, and it looked like a physics fault both times.
 
+    THE LAST WAYPOINT GETS `settle_seconds`, NOT `hold_seconds`. It is where
+    the grip happens, and these joints arrive slowly enough that a short hold
+    closes the jaws while the arm is still coming down. Measured on the bench:
+    with every waypoint held the same, the bottom of the descent sat 12.6 mm
+    above the grasp plane at one waypoint and 17.3 mm at three - the dwell,
+    not the geometry, decided where the jaws ended up.
+
     The gripper is already open at the first pose: opening it after arriving
     would sweep the jaws through the litter just as surely.
     """
@@ -121,8 +129,9 @@ def grasp_sequence(
     reach = _pose_of(descent[-1])
 
     steps = [(dict(_pose_of(s), gripper=gripper_open), hold_seconds)
-             for s in descent]
+             for s in descent[:-1]]
     steps += [
+        (dict(reach, gripper=gripper_open), settle_seconds),
         (dict(reach, gripper=gripper_closed), hold_seconds),
         (dict(clear, gripper=gripper_closed), hold_seconds),
         (dict(search_pose, gripper=gripper_closed), hold_seconds),

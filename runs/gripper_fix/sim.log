@@ -1,0 +1,84 @@
+[INFO] [launch]: All log files can be found below /home/dev/.ros/log/2026-08-02-04-16-15-846180-archlinux-30
+[INFO] [launch]: Default logging verbosity is set to INFO
+[INFO] [gazebo-1]: process started with pid [35]
+[INFO] [robot_state_publisher-2]: process started with pid [36]
+[INFO] [create-3]: process started with pid [37]
+[INFO] [parameter_bridge-4]: process started with pid [38]
+[INFO] [laserscan_to_range-5]: process started with pid [40]
+[INFO] [laserscan_to_range-6]: process started with pid [41]
+[INFO] [gps_covariance-7]: process started with pid [42]
+[INFO] [sim_litter_detector-8]: process started with pid [43]
+[INFO] [ekf_node-9]: process started with pid [44]
+[INFO] [static_transform_publisher-10]: process started with pid [45]
+[robot_state_publisher-2] [INFO] [1785644177.511760170] [robot_state_publisher]: Robot initialized
+[static_transform_publisher-10] [INFO] [1785644177.516664034] [map_to_odom_static]: Spinning until stopped - publishing transform
+[static_transform_publisher-10] translation: ('0.000000', '0.000000', '0.000000')
+[static_transform_publisher-10] rotation: ('0.000000', '0.000000', '0.000000', '1.000000')
+[static_transform_publisher-10] from 'map' to 'odom'
+[ekf_node-9] [INFO] [1785644177.522396457] [ekf_local]: Waiting for clock to start...
+[create-3] [INFO] [1785644177.538406192] [ros_gz_sim]: Requesting list of world names.
+[create-3] [INFO] [1785644178.286246886] [ros_gz_sim]: Waiting messages on topic [/robot_description].
+[create-3] [INFO] [1785644178.299400168] [ros_gz_sim]: Entity creation successful.
+[INFO] [create-3]: process has finished cleanly [pid 37]
+[laserscan_to_range-5] [INFO] [1785644178.485696720] [laserscan_to_range]: Converting 5 ultrasonic cones to Range: front_left, front_midleft, front_center, front_midright, front_right
+[gps_covariance-7] [INFO] [1785644178.488949429] [gps_covariance_shim]: Filling GPS covariance: horizontal 2.5 m, vertical 5.0 m
+[laserscan_to_range-6] [INFO] [1785644178.495334098] [tof_to_range]: Converting 1 ultrasonic cones to Range: pod
+[parameter_bridge-4] [INFO] [1785644178.572372321] [ros_gz_bridge]: Creating GZ->ROS Bridge: [/clock (gz.msgs.Clock) -> /clock (rosgraph_msgs/msg/Clock)] (Lazy 0)
+[parameter_bridge-4] [INFO] [1785644178.574832829] [ros_gz_bridge]: Creating ROS->GZ Bridge: [/cmd_vel (geometry_msgs/msg/Twist) -> /model/drivebase/cmd_vel (gz.msgs.Twist)] (Lazy 0)
+[parameter_bridge-4] [INFO] [1785644178.578298679] [ros_gz_bridge]: Creating GZ->ROS Bridge: [/model/drivebase/odom (gz.msgs.Odometry) -> /odom (nav_msgs/msg/Odometry)] (Lazy 0)
+[parameter_bridge-4] [INFO] [1785644178.581149541] [ros_gz_bridge]: Creating GZ->ROS Bridge: [/model/drivebase/joint_state (gz.msgs.Model) -> /joint_states (sensor_msgs/msg/JointState)] (Lazy 0)
+[parameter_bridge-4] [INFO] [1785644178.584644245] [ros_gz_bridge]: Creating GZ->ROS Bridge: [/imu/data (gz.msgs.IMU) -> /imu/data (sensor_msgs/msg/Imu)] (Lazy 0)
+[parameter_bridge-4] [INFO] [1785644178.586048987] [ros_gz_bridge]: Creating GZ->ROS Bridge: [/gps/fix (gz.msgs.NavSat) -> /gps/fix_raw (sensor_msgs/msg/NavSatFix)] (Lazy 0)
+[parameter_bridge-4] [INFO] [1785644178.586925666] [ros_gz_bridge]: Creating GZ->ROS Bridge: [/ultrasonic/front_left/scan (gz.msgs.LaserScan) -> /ultrasonic/front_left/scan (sensor_msgs/msg/LaserScan)] (Lazy 0)
+[parameter_bridge-4] [INFO] [1785644178.587751710] [ros_gz_bridge]: Creating GZ->ROS Bridge: [/ultrasonic/front_midleft/scan (gz.msgs.LaserScan) -> /ultrasonic/front_midleft/scan (sensor_msgs/msg/LaserScan)] (Lazy 0)
+[parameter_bridge-4] [INFO] [1785644178.588369583] [ros_gz_bridge]: Creating GZ->ROS Bridge: [/ultrasonic/front_center/scan (gz.msgs.LaserScan) -> /ultrasonic/front_center/scan (sensor_msgs/msg/LaserScan)] (Lazy 0)
+[parameter_bridge-4] [INFO] [1785644178.589014255] [ros_gz_bridge]: Creating GZ->ROS Bridge: [/ultrasonic/front_midright/scan (gz.msgs.LaserScan) -> /ultrasonic/front_midright/scan (sensor_msgs/msg/LaserScan)] (Lazy 0)
+[parameter_bridge-4] [INFO] [1785644178.589641255] [ros_gz_bridge]: Creating GZ->ROS Bridge: [/ultrasonic/front_right/scan (gz.msgs.LaserScan) -> /ultrasonic/front_right/scan (sensor_msgs/msg/LaserScan)] (Lazy 0)
+[parameter_bridge-4] [INFO] [1785644178.590195798] [ros_gz_bridge]: Creating GZ->ROS Bridge: [/model/drivebase/ground_truth (gz.msgs.Odometry) -> /gz/ground_truth (nav_msgs/msg/Odometry)] (Lazy 0)
+[parameter_bridge-4] [INFO] [1785644178.590755711] [ros_gz_bridge]: Creating GZ->ROS Bridge: [/pod_camera/image (gz.msgs.Image) -> /pod_camera/image_raw (sensor_msgs/msg/Image)] (Lazy 0)
+[parameter_bridge-4] [INFO] [1785644178.591453213] [ros_gz_bridge]: Creating GZ->ROS Bridge: [/pod_camera/camera_info (gz.msgs.CameraInfo) -> /pod_camera/camera_info (sensor_msgs/msg/CameraInfo)] (Lazy 0)
+[parameter_bridge-4] [INFO] [1785644178.592320154] [ros_gz_bridge]: Creating GZ->ROS Bridge: [/tof/pod/scan (gz.msgs.LaserScan) -> /tof/pod/scan (sensor_msgs/msg/LaserScan)] (Lazy 0)
+[parameter_bridge-4] [INFO] [1785644178.592910123] [ros_gz_bridge]: Creating ROS->GZ Bridge: [/arm/shoulder_pan/position (std_msgs/msg/Float64) -> /arm/shoulder_pan/position (gz.msgs.Double)] (Lazy 0)
+[parameter_bridge-4] [INFO] [1785644178.593871782] [ros_gz_bridge]: Creating ROS->GZ Bridge: [/arm/shoulder_lift/position (std_msgs/msg/Float64) -> /arm/shoulder_lift/position (gz.msgs.Double)] (Lazy 0)
+[parameter_bridge-4] [INFO] [1785644178.594433730] [ros_gz_bridge]: Creating ROS->GZ Bridge: [/arm/elbow_flex/position (std_msgs/msg/Float64) -> /arm/elbow_flex/position (gz.msgs.Double)] (Lazy 0)
+[parameter_bridge-4] [INFO] [1785644178.595062933] [ros_gz_bridge]: Creating ROS->GZ Bridge: [/arm/wrist_flex/position (std_msgs/msg/Float64) -> /arm/wrist_flex/position (gz.msgs.Double)] (Lazy 0)
+[parameter_bridge-4] [INFO] [1785644178.595629719] [ros_gz_bridge]: Creating ROS->GZ Bridge: [/arm/wrist_roll/position (std_msgs/msg/Float64) -> /arm/wrist_roll/position (gz.msgs.Double)] (Lazy 0)
+[parameter_bridge-4] [INFO] [1785644178.596237432] [ros_gz_bridge]: Creating ROS->GZ Bridge: [/arm/gripper/position (std_msgs/msg/Float64) -> /arm/gripper/position (gz.msgs.Double)] (Lazy 0)
+[sim_litter_detector-8] [INFO] [1785644179.112555741] [sim_litter_detector]: Simulated litter detector started
+[gazebo-1] [1;33mWarning [Utils.cc:132][0m [/sdf/model[@name="drivebase"]/link[@name="base_footprint"]/sensor[@name="navsat_sensor"]/gz_frame_id:<urdf-string>:L0]: XML Element[gz_frame_id], child of element[sensor], not defined in SDF. Copying[gz_frame_id] as children of [sensor].
+[gazebo-1] [1;33mWarning [Utils.cc:132][0m [/sdf/model[@name="drivebase"]/link[@name="base_footprint"]/sensor[@name="imu_sensor"]/gz_frame_id:<urdf-string>:L0]: XML Element[gz_frame_id], child of element[sensor], not defined in SDF. Copying[gz_frame_id] as children of [sensor].
+[gazebo-1] [1;33mWarning [Utils.cc:132][0m [/sdf/model[@name="drivebase"]/link[@name="base_footprint"]/sensor[@name="ultrasonic_front_center"]/gz_frame_id:<urdf-string>:L0]: XML Element[gz_frame_id], child of element[sensor], not defined in SDF. Copying[gz_frame_id] as children of [sensor].
+[gazebo-1] [1;33mWarning [Utils.cc:132][0m [/sdf/model[@name="drivebase"]/link[@name="base_footprint"]/sensor[@name="ultrasonic_front_center"]/lidar/noise[@type="gaussian"]:<urdf-string>:L0]: XML Attribute[type] in element[noise] not defined in SDF.
+[gazebo-1] [1;33mWarning [Utils.cc:132][0m [/sdf/model[@name="drivebase"]/link[@name="base_footprint"]/sensor[@name="ultrasonic_front_left"]/gz_frame_id:<urdf-string>:L0]: XML Element[gz_frame_id], child of element[sensor], not defined in SDF. Copying[gz_frame_id] as children of [sensor].
+[gazebo-1] [1;33mWarning [Utils.cc:132][0m [/sdf/model[@name="drivebase"]/link[@name="base_footprint"]/sensor[@name="ultrasonic_front_left"]/lidar/noise[@type="gaussian"]:<urdf-string>:L0]: XML Attribute[type] in element[noise] not defined in SDF.
+[gazebo-1] [1;33mWarning [Utils.cc:132][0m [/sdf/model[@name="drivebase"]/link[@name="base_footprint"]/sensor[@name="ultrasonic_front_midleft"]/gz_frame_id:<urdf-string>:L0]: XML Element[gz_frame_id], child of element[sensor], not defined in SDF. Copying[gz_frame_id] as children of [sensor].
+[gazebo-1] [1;33mWarning [Utils.cc:132][0m [/sdf/model[@name="drivebase"]/link[@name="base_footprint"]/sensor[@name="ultrasonic_front_midleft"]/lidar/noise[@type="gaussian"]:<urdf-string>:L0]: XML Attribute[type] in element[noise] not defined in SDF.
+[gazebo-1] [1;33mWarning [Utils.cc:132][0m [/sdf/model[@name="drivebase"]/link[@name="base_footprint"]/sensor[@name="ultrasonic_front_midright"]/gz_frame_id:<urdf-string>:L0]: XML Element[gz_frame_id], child of element[sensor], not defined in SDF. Copying[gz_frame_id] as children of [sensor].
+[gazebo-1] [1;33mWarning [Utils.cc:132][0m [/sdf/model[@name="drivebase"]/link[@name="base_footprint"]/sensor[@name="ultrasonic_front_midright"]/lidar/noise[@type="gaussian"]:<urdf-string>:L0]: XML Attribute[type] in element[noise] not defined in SDF.
+[gazebo-1] [1;33mWarning [Utils.cc:132][0m [/sdf/model[@name="drivebase"]/link[@name="base_footprint"]/sensor[@name="ultrasonic_front_right"]/gz_frame_id:<urdf-string>:L0]: XML Element[gz_frame_id], child of element[sensor], not defined in SDF. Copying[gz_frame_id] as children of [sensor].
+[gazebo-1] [1;33mWarning [Utils.cc:132][0m [/sdf/model[@name="drivebase"]/link[@name="base_footprint"]/sensor[@name="ultrasonic_front_right"]/lidar/noise[@type="gaussian"]:<urdf-string>:L0]: XML Attribute[type] in element[noise] not defined in SDF.
+[gazebo-1] [1;33mWarning [Utils.cc:132][0m [/sdf/model[@name="drivebase"]/link[@name="arm_wrist_link"]/sensor[@name="pod_camera"]/gz_frame_id:<urdf-string>:L0]: XML Element[gz_frame_id], child of element[sensor], not defined in SDF. Copying[gz_frame_id] as children of [sensor].
+[gazebo-1] [1;33mWarning [Utils.cc:132][0m [/sdf/model[@name="drivebase"]/link[@name="arm_wrist_link"]/sensor[@name="pod_tof"]/gz_frame_id:<urdf-string>:L0]: XML Element[gz_frame_id], child of element[sensor], not defined in SDF. Copying[gz_frame_id] as children of [sensor].
+[gazebo-1] [1;33mWarning [Utils.cc:132][0m [/sdf/model[@name="drivebase"]/link[@name="arm_wrist_link"]/sensor[@name="pod_tof"]/lidar/noise[@type="gaussian"]:<urdf-string>:L0]: XML Attribute[type] in element[noise] not defined in SDF.
+[gazebo-1] amdgpu: os_same_file_description couldn't determine if two DRM fds reference the same file description.
+[gazebo-1] If they do, bad things may happen!
+[parameter_bridge-4] [INFO] [1785644252.746838241] [ros_gz_bridge]: Passing message from ROS geometry_msgs/msg/Twist to Gazebo gz.msgs.Twist (showing msg only once per type)
+[parameter_bridge-4] [INFO] [1785644253.501453668] [ros_gz_bridge]: Passing message from ROS std_msgs/msg/Float64 to Gazebo gz.msgs.Double (showing msg only once per type)
+[gazebo-1] NodeShared::RecvSrvRequest() error sending response: Host unreachable
+[gazebo-1] NodeShared::RecvSrvRequest() error sending response: Host unreachable
+[gazebo-1] NodeShared::RecvSrvRequest() error sending response: Host unreachable
+[gazebo-1] NodeShared::RecvSrvRequest() error sending response: Host unreachable
+[gazebo-1] NodeShared::RecvSrvRequest() error sending response: Host unreachable
+[gazebo-1] NodeShared::RecvSrvRequest() error sending response: Host unreachable
+[gazebo-1] NodeShared::RecvSrvRequest() error sending response: Host unreachable
+[gazebo-1] NodeShared::RecvSrvRequest() error sending response: Host unreachable
+[gazebo-1] NodeShared::RecvSrvRequest() error sending response: Host unreachable
+[gazebo-1] NodeShared::RecvSrvRequest() error sending response: Host unreachable
+[gazebo-1] NodeShared::RecvSrvRequest() error sending response: Host unreachable
+[gazebo-1] NodeShared::RecvSrvRequest() error sending response: Host unreachable
+[gazebo-1] NodeShared::RecvSrvRequest() error sending response: Host unreachable
+[gazebo-1] NodeShared::RecvSrvRequest() error sending response: Host unreachable
+[gazebo-1] NodeShared::RecvSrvRequest() error sending response: Host unreachable
+[gazebo-1] NodeShared::RecvSrvRequest() error sending response: Host unreachable
+[gazebo-1] NodeShared::RecvSrvRequest() error sending response: Host unreachable
+[gazebo-1] NodeShared::RecvSrvRequest() error sending response: Host unreachable

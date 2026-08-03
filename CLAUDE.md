@@ -130,3 +130,16 @@ error on either side.
 of straight driving costs essentially nothing. Two turns put the base ~0.7 m
 off, far larger than a piece of litter. The arm has to be aimed by the camera
 closing its own loop, **never by driving to a coordinate.**
+
+## gstack (recommended)
+
+This project uses [gstack](https://github.com/garrytan/gstack) for AI-assisted workflows.
+Install it for the best experience:
+
+```bash
+git clone --depth 1 https://github.com/garrytan/gstack.git ~/.claude/skills/gstack
+cd ~/.claude/skills/gstack && ./setup --team
+```
+
+Skills like /qa, /ship, /review, /investigate, and /browse become available after install.
+Use /browse for all web browsing. Use ~/.claude/skills/gstack/... for gstack file paths.

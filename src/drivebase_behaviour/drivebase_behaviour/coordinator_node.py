@@ -218,6 +218,10 @@ class Coordinator(Node):
             # seconds each; see grasp_sequence for what one-shot did.
             "grasp_descent_steps": 6,
             "grasp_hold_seconds": 1.5,
+            # The bottom of the descent only. These joints arrive slowly and
+            # this is the pose the jaws close from, so a hold sized for a
+            # waypoint shuts them mid-move; see grasp_sequence.
+            "grasp_settle_seconds": 6.0,
             "wrist_roll_limit": 1.0,
             "approach_angle": -1.5708,
             "robot_description": "",
@@ -784,6 +788,7 @@ class Coordinator(Node):
             self.p("gripper_open"),
             self.p("gripper_closed"),
             self.p("grasp_hold_seconds"),
+            self.p("grasp_settle_seconds"),
         ))
 
     def _send_next_waypoint(self) -> None:

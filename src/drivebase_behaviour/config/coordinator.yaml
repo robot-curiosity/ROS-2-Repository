@@ -183,6 +183,11 @@
     # grasp_hold_seconds per step. Swept with scripts/grasp_lab.py.
     grasp_descent_steps: 6
     grasp_hold_seconds: 1.5
+    # MEASURED, and only for the bottom of the descent. With every waypoint
+    # held for grasp_hold_seconds the jaws finished 12.6 mm above the grasp
+    # plane at one waypoint and 17.3 mm at three - the dwell decided where
+    # they stopped, not the geometry, and they were closing on the way down.
+    grasp_settle_seconds: 6.0
 
     # NOT MEASURED, and docs/arm_workspace.md explicitly declines to endorse it:
     # it is a harness-routing decision and there is no harness yet. The URDF
