@@ -383,7 +383,23 @@ navigation log before reading anything into a run.**
 
 ### Next, in detail
 
-**1. Litter this gripper can hold.** The 66 × 70 mm cans are the last thing
+**1. The grasp bench drifts across a session, and until that is found its
+sweeps are worthless.** `scripts/grasp_lab.py` finishes each successive trial
+with the jaws higher above the grasp plane, on the same curve whatever the
+sweep varies — 13.1, 16.4, 18.0, 18.7, 19.0, 19.2 mm for `steps`; 13.3, 16.8,
+18.3, 18.9, 19.1 for `yaw`; 13.3, 16.9, 18.3, 18.9 for `repeat`. That is the
+trial index, not the parameter. Nothing lifts past the first trial or two, so
+three sweeps that read as "0/6 lifted" are measuring the drift and answer
+nothing about steps, orientation or friction. Settling at the bottom of the
+descent — a real and separate fix, now in `grasp_sequence` — did not touch it.
+
+`scripts/verify_pickup.py` does not have this: fresh session per probe, and it
+lifts flat litter repeatably. Trust it, not the bench. Suspects not yet
+eliminated: re-posing the probe while it is in contact, the arm never being
+commanded out of the grasp column between trials, and integrator windup in the
+six `JointPositionController`s over a long session.
+
+**2. Litter this gripper can hold.** The 66 × 70 mm cans are the last thing
 that still fails. The jaw pair is ~12 mm across at the tip and the pinch window
 for a 66 mm cylinder is one 2 mm grid step wide — measured, and it shows in the
 simulator as a can that is nudged, rolls, and is gone. Flat litter (24 mm tall,
@@ -391,7 +407,7 @@ simulator as a can that is nudged, rolls, and is gone. Flat litter (24 mm tall,
 hardware could actually hold, or the jaws change; this is a decision, not an
 investigation.
 
-**2. Re-measure what the mount drop invalidated.** The mount moved to 224 mm on
+**3. Re-measure what the mount drop invalidated.** The mount moved to 224 mm on
 2026-08-02 and the pod came down 36 mm with it, but the poses were not
 re-measured: `confirm_pose` via `scripts/pod_aim_search.py`, `search_pose`,
 `approach_bbox_height_min`, `grasp_min`/`grasp_max`, and §1/§3 of
