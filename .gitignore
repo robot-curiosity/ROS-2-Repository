@@ -1,0 +1,7 @@
+build/
+install/
+log/
+core.*
+__pycache__/
+*.pyc
+*.pt
