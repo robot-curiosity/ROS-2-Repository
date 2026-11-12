@@ -1,0 +1,21 @@
+# ROS 2 / colcon
+build/
+install/
+log/
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.venv/
+# Core dumps
+core
+core.*
+# Editor / OS
+.vscode/
+.idea/
+*.swp
+.DS_Store
+# Secrets
+.env
+*.key
