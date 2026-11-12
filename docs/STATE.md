@@ -10,7 +10,7 @@ Sources: Bryan's statements on 2026-11-11; the Onshape document; the ROS 2 robot
 | 2027-03-08 | LACSEF fair day, Shrine Expo Hall | https://lacsef.github.io/ |
 | 2027-05-08 to 05-14 | Regeneron ISEF 2027, Los Angeles | a regional fair's page; confirm on the official ISEF site |
 
-LACSEF revised its competition categories for 2027. Confirm the project is still entered in the right one. Safety and pre-approval form dates are in the official 2026-27 dates and deadlines document and have not been checked yet.
+LACSEF revised its competition categories for 2027. Confirm the project is still entered in the right one. The LACSEF forms (safety and pre-approval) are already filled out, per Bryan on 2026-11-11. Only the project work is left.
 
 Earlier plans targeted LACSEF in March 2026 with a January 2026 demo. That timeline is obsolete.
 

@@ -1,4 +1,4 @@
-> Model-written study (Fable 5.2), 2026-11-11, from the docs in this folder and sources it lists at the end. Recommendations are not decisions: see DECISIONS.md for what the team has actually decided. One correction applies: the pan tolerance is about 1 to 4 cm across the pick zone, measured from the arm base axis, not 7 cm (see REPO-REVIEW.md).
+> Model-written study (Fable 5.2), 2026-11-11 (it flags the fair forms as unchecked; Bryan has since confirmed they are filled out), from the docs in this folder and sources it lists at the end. Recommendations are not decisions: see DECISIONS.md for what the team has actually decided. One correction applies: the pan tolerance is about 1 to 4 cm across the pick zone, measured from the arm base axis, not 7 cm (see REPO-REVIEW.md).
 
 # Curiosity design study: software and algorithms
 
