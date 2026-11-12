@@ -40,13 +40,13 @@ The image center is the camera's own axis, which is 15.75 cm to the right of the
 | 1.0 m ahead | 0.38 | LEFT (just) |
 | 1.5 m ahead | 0.41 | CENTER |
 
-At 0.69 m, "CENTER" covers items from 4 cm to 27 cm to the right of the arm's line. The arm's collision-free pick study used a pan range of only plus or minus 9 degrees, about plus or minus 7 cm at the 0.45 m reach. So steering until the node says "CENTER" would stop the robot with the item outside the arm's studied reach.
+At 0.69 m, "CENTER" covers items from 4 cm to 27 cm to the right of the arm's line. The arm's collision-free pick study used a pan range of only plus or minus 9 degrees. Pan swings about the arm's own base axis (x = 0.28 m in base_link), not about base_link, so across the pick zone that is only about plus or minus 1 to 4 cm sideways (2.7 cm at the 0.448 m tip pose). So steering until the node says "CENTER" would stop the robot with the item well outside the arm's studied reach. (An earlier version of this file said plus or minus 7 cm; that measured from the wrong point.)
 
 Fix: do not steer on pixel direction. Project the floor point to base_link coordinates (below), then drive until the item is at y near 0 and x between 0.35 and 0.56 m.
 
 ### 2. Blind zone before the pick zone
 
-The mast camera sees the ground from 0.69 m ahead of base_link. The pick zone is 0.35 to 0.56 m ahead. The last 0.13 to 0.34 m of approach is out of view. Options: drive that distance by wheel odometry after the last detection (simple, a few centimeters of error), or add the wrist camera the SO-101 camera URDF describes.
+The mast camera sees the ground from 0.69 m ahead of base_link. The pick zone is 0.35 to 0.56 m ahead. The last 0.13 to 0.34 m of approach is out of view by geometry, and the study (FABLE-STUDY-REPORT.md) argues 0.20 to 0.45 m in practice, because a box touching the bottom edge gives a bad floor point. Options: drive that distance by wheel odometry after the last detection (simple, a few centimeters of error), or add the wrist camera the SO-101 camera URDF describes.
 
 ### 3. Detections are text with no timestamp or frame
 

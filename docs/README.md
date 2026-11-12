@@ -10,7 +10,8 @@ Last consolidated: 2026-11-11.
 | [DECISIONS.md](DECISIONS.md) | What has been decided, what is deliberately deferred, and what is still open |
 | [RISKS.md](RISKS.md) | What is likely to go wrong, ranked, with a mitigation for each |
 | [REPO-REVIEW.md](REPO-REVIEW.md) | What is in this repo, and how it compares with the simulation results |
-| [FABLE-STUDY-BRIEF.md](FABLE-STUDY-BRIEF.md) | A self-contained brief for a deep study of the pick-up, obstacle detection, recognition, selection and navigation algorithms |
+| [FABLE-STUDY-BRIEF.md](FABLE-STUDY-BRIEF.md) | The brief given for a deep study of the pick-up, obstacle detection, recognition, selection and navigation algorithms |
+| [FABLE-STUDY-REPORT.md](FABLE-STUDY-REPORT.md) | The study's result: a two-week plan, a section per question, a dated schedule to Jan 20 and five experiments. Recommendations, not decisions |
 
 ## Where the other pieces live
 

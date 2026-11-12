@@ -19,7 +19,7 @@ Study the software and algorithm problems below for a student-built litter-colle
 
 - The camera sees ground from 0.69 m to 2.73 m ahead of base_link. The arm's pick zone is 0.35 to 0.56 m ahead, so the last 0.13 to 0.34 m of an approach is out of view.
 - The camera is 15.75 cm right of the arm line. Steering until the detection is at the image center leaves the item about 16 cm right of where the arm can reach. The detector's current "CENTER" band excludes the arm line for items closer than about 1 m. A ground-plane projection to base_link fixes this and is available (see REPO-REVIEW.md).
-- The arm's collision-free pick study sampled a pan range of only +/- 9 degrees (about 7 cm sideways at the 0.45 m reach). 603 collision-free pick poses exist at the current shelf height. The wider pan range was not studied.
+- The arm's collision-free pick study sampled a pan range of only +/- 9 degrees (about 1 to 4 cm sideways across the pick zone, since pan swings about the arm's own base axis at x = 0.28 m). 603 collision-free pick poses exist at the current shelf height. The wider pan range was not studied.
 - Sonar covers 24 to 42% of directions at 1 m, with blind sectors up to 62 degrees. We treat it as a bumper.
 - Simulation: 15 degree slope with a full bin is within motor torque; runtime about 45 minutes on a 12 V 3 Ah pack; the bin holds a trash bag.
 
