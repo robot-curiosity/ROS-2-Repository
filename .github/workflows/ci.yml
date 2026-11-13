@@ -35,15 +35,14 @@ jobs:
           . /opt/ros/jazzy/setup.bash
           colcon build --packages-select trash_vision
 
-      # Skips the ament style tests (test_flake8, test_pep257, test_copyright).
+      # Skips the ament style tests (test_flake8, test_pep257, test_copyright) by name.
+      # Do not put those words in the names of real tests.
       - name: Unit tests
         run: |
           . /opt/ros/jazzy/setup.bash
           . install/setup.bash
           python3 -m pytest src/trash_vision/test \
-            --ignore=src/trash_vision/test/test_flake8.py \
-            --ignore=src/trash_vision/test/test_pep257.py \
-            --ignore=src/trash_vision/test/test_copyright.py \
+            -k "not flake8 and not pep257 and not copyright" \
             -v || [ $? -eq 5 ]  # exit 5 = no tests collected yet; not a failure
 
   # Agent PRs into dev merge themselves once the build and tests pass.
