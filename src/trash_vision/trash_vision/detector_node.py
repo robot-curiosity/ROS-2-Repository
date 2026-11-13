@@ -29,6 +29,9 @@ from std_msgs.msg import String
 # Ultralytics:
 from ultralytics import YOLO
 
+# Target logic (ROS-free, unit tested):
+from trash_vision.target_logic import build_target, get_direction
+
 
 # Detector:
 class TrashDetector(Node):
@@ -314,71 +317,17 @@ class TrashDetector(Node):
             confidences[best_index]
         )
 
-        # Calculations:
-        center_x_pixels = (x1 + x2) / 2.0
-        center_y_pixels = (y1 + y2) / 2.0
-
-        center_x = center_x_pixels / width
-        center_y = center_y_pixels / height
-
-        floor_x = center_x_pixels / width
-        floor_y = y2 / height
-
-        horizontal_error = center_x - 0.5
+        # Direction and target message:
+        target = build_target(
+            bbox=(x1, y1, x2, y2),
+            image_size=(width, height),
+            confidence=confidence,
+            frame_number=self.frame_number,
+            deadband=self.deadband,
+        )
 
         # Direction:
-        direction = self.get_direction(horizontal_error)
-
-        # Target:
-        target = {
-            # Detected:
-            "detected": True,
-
-            # Frame:
-            "frame_number": self.frame_number,
-
-            # Confidence:
-            "confidence": round(confidence, 4),
-
-            # Pixels:
-            "bbox_pixels": {
-                # X1:
-                "x1": round(x1, 1),
-
-                # Y1:
-                "y1": round(y1, 1),
-
-                # X2:
-                "x2": round(x2, 1),
-
-                # Y2:
-                "y2": round(y2, 1),
-            },
-
-            # Center:
-            "center_normalized": {
-                # X:
-                "x": round(center_x, 4),
-
-                # Y:
-                "y": round(center_y, 4),
-            },
-
-            # FLoor:
-            "floor_point_normalized": {
-                # X:
-                "x": round(floor_x, 4),
-
-                # Y:
-                "y": round(floor_y, 4),
-            },
-
-            # Error:
-            "horizontal_error": round(horizontal_error, 4),
-
-            # Direction:
-            "direction": direction,
-        }
+        direction = target["direction"]
 
         # Target:
         self.publish_target(target, direction)
@@ -393,17 +342,8 @@ class TrashDetector(Node):
         )
 
     def get_direction(self, horizontal_error: float) -> str:
-        # Left:
-        if horizontal_error < -self.deadband:
-            return "LEFT"
-
-        # Right:
-        if horizontal_error > self.deadband:
-            return "RIGHT"
-
-        # Center:
-        return "CENTER"
-
+        # Direction:
+        return get_direction(horizontal_error, self.deadband)
 
     def publish_target(self, target: dict, direction: str) -> None:
         # Variables (Assignment):
