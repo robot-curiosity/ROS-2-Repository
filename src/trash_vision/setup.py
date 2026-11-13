@@ -26,6 +26,7 @@ setup(
         'console_scripts': [
             "detector = trash_vision.detector_node:main",
             "ultrasonic = trash_vision.ultrasonic_node:main",
+            "drive = trash_vision.drive_node:main",
         ],
     },
 )
