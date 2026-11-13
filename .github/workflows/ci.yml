@@ -14,6 +14,9 @@ jobs:
   build-and-test:
     runs-on: ubuntu-latest
     container: ros:jazzy
+    defaults:
+      run:
+        shell: bash
     steps:
       - uses: actions/checkout@v4
 
