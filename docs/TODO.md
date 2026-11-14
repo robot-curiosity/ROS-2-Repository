@@ -6,4 +6,4 @@
 - [x] 4. Arm control node: SO101 via LeRobot (Feetech STS3215), pick service/action
 - [x] 5. GPS/IMU node: publish NavSatFix and Imu (device model TODO: Bryan to fill in)
 - [x] 6. Behavior/state machine: search -> approach -> pick -> deposit, with obstacle avoidance
-- [ ] 7. Simulation launch (Gazebo) and bringup launch file for the real robot
+- [x] 7. Simulation launch (Gazebo) and bringup launch file for the real robot
