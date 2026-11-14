@@ -5,5 +5,5 @@
 - [x] 3. Drive/encoder node: 2x Cytron MDD10A + JGB37-520 encoders, cmd_vel -> motors, odometry
 - [x] 4. Arm control node: SO101 via LeRobot (Feetech STS3215), pick service/action
 - [x] 5. GPS/IMU node: publish NavSatFix and Imu (device model TODO: Bryan to fill in)
-- [ ] 6. Behavior/state machine: search -> approach -> pick -> deposit, with obstacle avoidance
+- [x] 6. Behavior/state machine: search -> approach -> pick -> deposit, with obstacle avoidance
 - [ ] 7. Simulation launch (Gazebo) and bringup launch file for the real robot
