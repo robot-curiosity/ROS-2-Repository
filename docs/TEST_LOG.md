@@ -8,3 +8,4 @@
 | 2026-11-13 | pytest test_drive_logic.py + detection + ultrasonic tests (21 tests); flake8 --select=E9,F; py_compile drive_node.py | pass | ROS 2/gpiozero not installed locally; node not run; CI runs full build |
 | 2026-11-13 | pytest test_arm_logic.py + existing logic tests (30 tests); flake8 --select=E9,F; py_compile arm_node.py | pass | ROS 2/LeRobot not installed locally; node not run; CI runs full build |
 | 2026-11-13 | pytest test_*_logic.py incl. new test_gps_imu_logic.py (39 tests); flake8 E,F,W on new files | pass | ROS 2/pyserial/smbus2 not installed locally; node not run; CI runs full build |
+| 2026-11-14 | pytest test_*_logic.py incl. new test_behavior_logic.py (50 tests); flake8 --select=E9,F; py_compile behavior_node.py | pass | ROS 2 not installed locally; node not run; CI runs full build |
