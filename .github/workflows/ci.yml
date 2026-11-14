@@ -1,0 +1,64 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [dev, master]
+  push:
+    branches: [dev, master]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    container: ros:jazzy
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install tools
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends \
+            python3-colcon-common-extensions python3-pytest python3-flake8
+
+      # Errors only (syntax errors, undefined names). Style rules are not enforced here.
+      - name: Lint (errors only)
+        run: python3 -m flake8 --select=E9,F --max-line-length=120 src
+
+      - name: Build
+        run: |
+          . /opt/ros/jazzy/setup.bash
+          colcon build --packages-select trash_vision
+
+      # Skips the ament style tests (test_flake8, test_pep257, test_copyright) by name.
+      # Do not put those words in the names of real tests.
+      - name: Unit tests
+        run: |
+          . /opt/ros/jazzy/setup.bash
+          . install/setup.bash
+          python3 -m pytest src/trash_vision/test \
+            -k "not flake8 and not pep257 and not copyright" \
+            -v || [ $? -eq 5 ]  # exit 5 = no tests collected yet; not a failure
+
+  # Agent PRs into dev merge themselves once the build and tests pass.
+  # master is never touched here: it is promoted from dev by hand after a hardware test.
+  auto-merge-agent-pr:
+    needs: build-and-test
+    if: >
+      github.event_name == 'pull_request' &&
+      github.base_ref == 'dev' &&
+      startsWith(github.head_ref, 'agent/') &&
+      github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    steps:
+      - name: Squash-merge into dev
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: >
+          gh pr merge ${{ github.event.pull_request.number }}
+          --repo ${{ github.repository }} --squash --delete-branch

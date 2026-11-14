@@ -29,6 +29,12 @@ from std_msgs.msg import String
 # Ultralytics:
 from ultralytics import YOLO
 
+# Logic:
+from trash_vision import detection_logic
+
+# OS:
+import os
+
 
 # Detector:
 class TrashDetector(Node):
@@ -76,6 +82,12 @@ class TrashDetector(Node):
 
                 # Quality:
                 ("mapping_jpeg_quality", 80),
+
+                # GPT-4o fallback (key is read from OPENAI_API_KEY):
+                ("gpt_fallback_enabled", False),
+                ("gpt_fallback_interval_seconds", 5.0),
+                ("gpt_fallback_low_confidence", 0.30),
+                ("gpt_model", "gpt-4o"),
             ],
         )
 
@@ -123,6 +135,30 @@ class TrashDetector(Node):
                 "mapping_jpeg_quality"
             ).value
         )
+
+        # GPT fallback:
+        self.gpt_fallback_enabled: bool = bool(
+            self.get_parameter("gpt_fallback_enabled").value
+        )
+        self.gpt_fallback_interval: float = float(
+            self.get_parameter("gpt_fallback_interval_seconds").value
+        )
+        self.gpt_fallback_low_conf: float = float(
+            self.get_parameter("gpt_fallback_low_confidence").value
+        )
+        self.gpt_model: str = str(self.get_parameter("gpt_model").value)
+        self.gpt_last_call_time = -1e9
+        self.gpt_busy = threading.Event()
+        self.gpt_result = None
+        self.gpt_result_time = 0.0
+        self.gpt_lock = threading.Lock()
+        if self.gpt_fallback_enabled and not os.environ.get(
+                "OPENAI_API_KEY"):
+            self.get_logger().warning(
+                "gpt_fallback_enabled but OPENAI_API_KEY is not set; "
+                "fallback disabled"
+            )
+            self.gpt_fallback_enabled = False
 
         # Publisher:
         self.target_publisher = self.create_publisher(
@@ -283,8 +319,25 @@ class TrashDetector(Node):
         # Boxes:
         boxes = results[0].boxes
 
+        # Fallback:
+        num_boxes = 0 if boxes is None else len(boxes)
+        best_conf = (
+            float(boxes.conf.max()) if num_boxes else None
+        )
+        self.maybe_start_gpt_fallback(frame, num_boxes, best_conf)
+
         # Validation:
-        if boxes is None or len(boxes) == 0:
+        if num_boxes == 0:
+            # GPT result (fresh only):
+            gpt_target = self.take_gpt_target(width, height)
+            if gpt_target is not None:
+                self.publish_target(gpt_target, gpt_target["direction"])
+                self.report_processing_rate(
+                    direction=gpt_target["direction"],
+                    confidence=gpt_target["confidence"],
+                )
+                return
+
             # Publish:
             self.publish_no_target()
 
@@ -393,16 +446,66 @@ class TrashDetector(Node):
         )
 
     def get_direction(self, horizontal_error: float) -> str:
-        # Left:
-        if horizontal_error < -self.deadband:
-            return "LEFT"
+        return detection_logic.get_direction(
+            horizontal_error, self.deadband
+        )
 
-        # Right:
-        if horizontal_error > self.deadband:
-            return "RIGHT"
+    def maybe_start_gpt_fallback(self, frame, num_boxes, best_conf) -> None:
+        now = time.monotonic()
+        if self.gpt_busy.is_set():
+            return
+        if not detection_logic.should_use_fallback(
+                num_boxes, best_conf, now, self.gpt_last_call_time,
+                self.gpt_fallback_enabled, self.gpt_fallback_interval,
+                self.gpt_fallback_low_conf):
+            return
+        ok, jpeg = cv2.imencode(".jpg", frame)
+        if not ok:
+            return
+        self.gpt_last_call_time = now
+        self.gpt_busy.set()
+        threading.Thread(
+            target=self.gpt_worker, args=(jpeg.tobytes(),), daemon=True
+        ).start()
 
-        # Center:
-        return "CENTER"
+    def gpt_worker(self, jpeg_bytes: bytes) -> None:
+        try:
+            payload = detection_logic.build_gpt_payload(
+                detection_logic.encode_jpeg_base64(jpeg_bytes),
+                self.gpt_model,
+            )
+            response = requests.post(
+                "https://api.openai.com/v1/chat/completions",
+                headers={
+                    "Authorization":
+                        "Bearer " + os.environ["OPENAI_API_KEY"]},
+                json=payload,
+                timeout=20,
+            )
+            response.raise_for_status()
+            text = response.json()["choices"][0]["message"]["content"]
+            box = detection_logic.parse_gpt_response(text)
+            with self.gpt_lock:
+                self.gpt_result = box
+                self.gpt_result_time = time.monotonic()
+        except Exception as error:
+            self.get_logger().warning(f"GPT fallback failed: {error}")
+        finally:
+            self.gpt_busy.clear()
+
+    def take_gpt_target(self, width: int, height: int):
+        # A GPT answer is only trusted for a short time after it arrives.
+        with self.gpt_lock:
+            box = self.gpt_result
+            age = time.monotonic() - self.gpt_result_time
+        if box is None or age > 2 * self.gpt_fallback_interval:
+            return None
+        return detection_logic.build_target(
+            box["x1"] * width, box["y1"] * height,
+            box["x2"] * width, box["y2"] * height,
+            width, height, box["confidence"],
+            self.frame_number, self.deadband, source="gpt4o",
+        )
 
 
     def publish_target(self, target: dict, direction: str) -> None:

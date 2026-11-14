@@ -1,0 +1,23 @@
+# Hardware parameters for the real robot. -1 / 0 / "" mean "not set yet":
+# the node idles with a warning. TODO: Bryan to fill in every value below.
+drive:
+  ros__parameters:
+    pwm_pins: [-1, -1]        # BCM, [left, right]
+    dir_pins: [-1, -1]
+    enc_a_pins: [-1, -1]
+    enc_b_pins: [-1, -1]
+    ticks_per_rev: 0.0
+    wheel_radius_m: 0.0
+    track_width_m: 0.0
+ultrasonic:
+  ros__parameters:
+    trig_pins: [-1, -1, -1, -1, -1, -1, -1, -1]   # front_1..4, rear_1..4
+    echo_pins: [-1, -1, -1, -1, -1, -1, -1, -1]
+arm:
+  ros__parameters:
+    port: ""                  # e.g. /dev/ttyACM0
+gps_imu:
+  ros__parameters:
+    gps_port: ""              # e.g. /dev/ttyAMA0
+    gps_baud: 9600
+    imu_model: ""             # "bno055" is the only backend so far
