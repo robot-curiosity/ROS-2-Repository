@@ -36,6 +36,11 @@ setup(
             "behavior = trash_vision.behavior_node:main",
             "sim = trash_vision.sim_node:main",
             "hardware_check = trash_vision.hardware_check:main",
+            "calibrate_encoders = trash_vision.calibrate:main_encoders",
+            "calibrate_drive = trash_vision.calibrate:main_drive",
+            "calibrate_pick_zone = trash_vision.calibrate:main_pick_zone",
+            "calibrate_camera = trash_vision.calibrate:main_camera",
+            "sonar_test = trash_vision.calibrate:main_sonar",
         ],
     },
 )
