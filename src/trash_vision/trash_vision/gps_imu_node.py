@@ -34,7 +34,8 @@ class GpsImu(Node):
             self._open_gps(port)
         else:
             self.get_logger().warning(
-                "gps_port not set; GPS idle. TODO: Bryan to fill in.")
+                "gps_imu idle: set gps_port in config/robot.yaml. "
+                "TODO: Bryan to fill in.")
         model = self.get_parameter("imu_model").value
         if model == "bno055":
             self._open_imu()
@@ -42,7 +43,8 @@ class GpsImu(Node):
             self.get_logger().error("Unsupported imu_model: " + model)
         else:
             self.get_logger().warning(
-                "imu_model not set; IMU idle. TODO: Bryan to fill in.")
+                "gps_imu idle: set imu_model in config/robot.yaml. "
+                "TODO: Bryan to fill in.")
 
         if self._serial is not None:
             self.create_timer(0.1, self._gps_tick)
