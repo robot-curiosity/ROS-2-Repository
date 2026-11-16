@@ -11,7 +11,8 @@ drive:
     track_width_m: 0.0
 ultrasonic:
   ros__parameters:
-    trig_pins: [-1, -1, -1, -1, -1, -1, -1, -1]   # front_1..4, rear_1..4
+    # Order: front_1, front_2, rear_1, rear_2, left_1, left_2, right_1, right_2
+    trig_pins: [-1, -1, -1, -1, -1, -1, -1, -1]
     echo_pins: [-1, -1, -1, -1, -1, -1, -1, -1]
 arm:
   ros__parameters:

@@ -6,10 +6,14 @@ from collections import deque
 SPEED_OF_SOUND_M_S = 343.0
 
 # Sensor order. Names become topic suffixes: /ultrasonic/<name>.
-SENSOR_NAMES = [
-    "front_1", "front_2", "front_3", "front_4",
-    "rear_1", "rear_2", "rear_3", "rear_4",
-]
+# Layout decided by Bryan (Nov 15, CAD "Curiosity"): 2 front, 2 rear, 2 left,
+# 2 right. Exact positions are a working assumption until Bryan confirms.
+# front_1 is left of front_2 (facing forward); left_*/right_* go front to back.
+FRONT_NAMES = ["front_1", "front_2"]
+REAR_NAMES = ["rear_1", "rear_2"]
+LEFT_NAMES = ["left_1", "left_2"]
+RIGHT_NAMES = ["right_1", "right_2"]
+SENSOR_NAMES = FRONT_NAMES + REAR_NAMES + LEFT_NAMES + RIGHT_NAMES
 
 # HC-SR04 datasheet limits.
 HC_SR04_MIN_RANGE_M = 0.02

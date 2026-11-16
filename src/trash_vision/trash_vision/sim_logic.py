@@ -3,13 +3,19 @@ import math
 
 from trash_vision import detection_logic as dl
 
-# Sensor mounting (sim only, NOT real hardware facts): bearing in radians
-# relative to robot heading (CCW positive), front_1 = leftmost.
-SENSOR_BEARINGS = {
-    "front_1": 0.45, "front_2": 0.15, "front_3": -0.15, "front_4": -0.45,
-    "rear_1": math.pi - 0.45, "rear_2": math.pi - 0.15,
-    "rear_3": math.pi + 0.15, "rear_4": math.pi + 0.45,
+# Sensor mounting (sim only, NOT real hardware facts; layout per TODO.md,
+# "working assumption until Bryan sends exact positions"): name ->
+# (forward offset m, left offset m, bearing rad CCW from robot heading).
+# Side sensors are staggered fore/aft by an assumed +-0.10 m.
+SENSOR_MOUNT = {
+    "front_1": (0.0, 0.0, 0.20), "front_2": (0.0, 0.0, -0.20),
+    "rear_1": (0.0, 0.0, math.pi - 0.20),
+    "rear_2": (0.0, 0.0, math.pi + 0.20),
+    "left_1": (0.10, 0.0, math.pi / 2), "left_2": (-0.10, 0.0, math.pi / 2),
+    "right_1": (0.10, 0.0, -math.pi / 2),
+    "right_2": (-0.10, 0.0, -math.pi / 2),
 }
+SENSOR_BEARINGS = {n: m[2] for n, m in SENSOR_MOUNT.items()}
 SENSOR_MAX_RANGE = 2.0
 CAMERA_FOV = 1.2          # horizontal field of view, rad (sim only)
 CAMERA_MAX_DIST = 3.0     # m
@@ -43,24 +49,30 @@ class SimWorld:
         self.x = min(max(nx, margin), self.width - margin)
         self.y = min(max(ny, margin), self.height - margin)
 
-    def range_at(self, bearing):
-        """Ray distance to the walls along robot-relative bearing."""
+    def range_at(self, bearing, forward=0.0, left=0.0):
+        """Ray distance to the walls along robot-relative bearing.
+
+        forward/left give the sensor's offset from the robot centre.
+        """
         a = self.yaw + bearing
         dx, dy = math.cos(a), math.sin(a)
+        ox = self.x + forward * math.cos(self.yaw) - left * math.sin(self.yaw)
+        oy = self.y + forward * math.sin(self.yaw) + left * math.cos(self.yaw)
         best = float("inf")
         if dx > 1e-9:
-            best = min(best, (self.width - self.x) / dx)
+            best = min(best, (self.width - ox) / dx)
         elif dx < -1e-9:
-            best = min(best, -self.x / dx)
+            best = min(best, -ox / dx)
         if dy > 1e-9:
-            best = min(best, (self.height - self.y) / dy)
+            best = min(best, (self.height - oy) / dy)
         elif dy < -1e-9:
-            best = min(best, -self.y / dy)
+            best = min(best, -oy / dy)
         return best if best <= SENSOR_MAX_RANGE else float("inf")
 
     def ranges(self):
         """Dict sensor name -> distance in metres (inf = nothing seen)."""
-        return {n: self.range_at(b) for n, b in SENSOR_BEARINGS.items()}
+        return {n: self.range_at(b, f, lf)
+                for n, (f, lf, b) in SENSOR_MOUNT.items()}
 
     def _polar(self, item):
         dx, dy = item[0] - self.x, item[1] - self.y

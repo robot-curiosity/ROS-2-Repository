@@ -2,7 +2,7 @@ import math
 
 from trash_vision import behavior_logic as bl
 
-CLEAR = [math.inf] * 4
+CLEAR = [math.inf] * 2
 
 
 def tgt(err=0.0, y=0.5, conf=0.9):
@@ -50,16 +50,16 @@ def test_target_lost_returns_to_search():
 def test_obstacle_stops_and_turns_away():
     m = bl.BehaviorMachine()
     m.step(0.0, tgt(), CLEAR, CLEAR)
-    c = m.step(0.1, tgt(), [0.1, 1.0, 1.0, 1.0], CLEAR)
+    c = m.step(0.1, tgt(), [0.1, 1.0], CLEAR)
     assert c.linear == 0.0 and c.angular < 0
-    c = m.step(0.2, tgt(), [1.0, 1.0, 1.0, 0.1], CLEAR)
+    c = m.step(0.2, tgt(), [1.0, 0.1], CLEAR)
     assert c.linear == 0.0 and c.angular > 0
 
 
 def test_slow_zone_scales_speed():
     m = bl.BehaviorMachine()
     fast = m.step(0.0, tgt(), CLEAR, CLEAR).linear
-    slow = m.step(0.1, tgt(), [0.4] * 4, CLEAR).linear
+    slow = m.step(0.1, tgt(), [0.4] * 2, CLEAR).linear
     assert 0 < slow < fast
 
 
@@ -96,7 +96,7 @@ def test_pick_failures_lead_to_recover_backup():
     assert m.state == bl.RECOVER
     c = m.step(11.5, None, CLEAR, CLEAR)
     assert c.linear < 0
-    c = m.step(11.6, None, CLEAR, [0.1] * 4)
+    c = m.step(11.6, None, CLEAR, [0.1] * 2)
     assert m.state == bl.SEARCH and c.linear == 0.0
 
 
@@ -109,7 +109,7 @@ def test_arm_timeout_counts_as_failure():
 
 
 # --- Wedge-proofing: every state must return to SEARCH on its own ---------
-BLOCKED = [0.1] * 4
+BLOCKED = [0.1] * 2
 # Never reaches the pick zone: target visible but floor y stays small.
 FAR = dict(err=0.0, y=0.3)
 
@@ -180,7 +180,7 @@ def test_pick_deposit_stow_each_time_out_to_search():
 
 
 def test_recover_returns_to_search_by_time_and_by_rear_sensor():
-    for rear, expect_t in ((CLEAR, 1.5), ([0.1] * 4, 0.0)):
+    for rear, expect_t in ((CLEAR, 1.5), ([0.1] * 2, 0.0)):
         m = bl.BehaviorMachine()
         m._enter(bl.RECOVER, 0.0)
         t = 0.0
@@ -214,3 +214,69 @@ def test_fresh_target_drops_stale_detection():
     assert bl.fresh_target(t, 10.0, 12.0, 1.0) is None
     assert bl.fresh_target(t, None, 12.0, 1.0) is None
     assert bl.fresh_target(None, 10.0, 10.1, 1.0) is None
+
+
+# --- Side clearance for rotation in place (sonar layout item 10) -----------
+NEAR = [0.1, 0.1]
+
+
+def test_search_spin_refused_toward_close_left_side_flips_to_right():
+    m = bl.BehaviorMachine()
+    c = m.step(0.0, None, CLEAR, CLEAR, NEAR, CLEAR)
+    assert c.linear == 0.0 and c.angular < 0  # CCW refused, spins CW instead
+    c = m.step(0.1, None, CLEAR, CLEAR, CLEAR, CLEAR)
+    assert c.angular < 0  # direction stays flipped once clear
+
+
+def test_search_spin_refused_toward_close_right_side():
+    m = bl.BehaviorMachine()
+    m._avoid_dir = -1.0  # currently spinning CW
+    c = m.step(0.0, None, CLEAR, CLEAR, CLEAR, NEAR)
+    assert c.angular > 0
+
+
+def test_search_spin_zero_when_both_sides_close():
+    m = bl.BehaviorMachine()
+    c = m.step(0.0, None, CLEAR, CLEAR, NEAR, NEAR)
+    assert c.linear == 0.0 and c.angular == 0.0
+
+
+def test_side_clearance_is_a_parameter():
+    m = bl.BehaviorMachine({"side_clearance": 0.05})
+    c = m.step(0.0, None, CLEAR, CLEAR, NEAR, NEAR)
+    assert c.angular > 0
+    m = bl.BehaviorMachine({"side_clearance": 0.5})
+    c = m.step(0.0, None, CLEAR, CLEAR, [0.4, 2.0], CLEAR)
+    assert c.angular < 0
+
+
+def test_side_sensor_on_far_side_does_not_limit_spin():
+    m = bl.BehaviorMachine()
+    c = m.step(0.0, None, CLEAR, CLEAR, CLEAR, NEAR)
+    assert c.angular > 0  # CCW swings left; right is close but irrelevant
+
+
+def test_avoidance_turn_refused_not_flipped_into_front_obstacle():
+    m = bl.BehaviorMachine()
+    m.step(0.0, tgt(), CLEAR, CLEAR)
+    # Front-left blocked -> would turn CW (right); right side is close.
+    c = m.step(0.1, tgt(), [0.1, 1.0], CLEAR, CLEAR, NEAR)
+    assert c.linear == 0.0 and c.angular == 0.0
+
+
+def test_moving_arc_is_not_limited_by_side_sensors():
+    m = bl.BehaviorMachine()
+    c = m.step(0.0, tgt(err=0.1), CLEAR, CLEAR, NEAR, NEAR)
+    assert c.linear > 0.02 and c.angular != 0.0
+
+
+def test_missing_side_lists_mean_no_restriction():
+    m = bl.BehaviorMachine()
+    assert m.step(0.0, None, CLEAR, CLEAR).angular > 0
+
+
+def test_recover_backs_up_using_rear_not_front():
+    m = bl.BehaviorMachine()
+    m._enter(bl.RECOVER, 0.0)
+    c = m.step(0.1, None, [0.05, 0.05], CLEAR, NEAR, NEAR)
+    assert c.linear < 0 and m.state == bl.RECOVER

@@ -40,4 +40,12 @@ def test_config_detects_problems():
 def test_nearest_obstacle():
     assert ul.nearest_obstacle({"a": math.inf, "b": 0.8, "c": 0.4}) == 0.4
     assert ul.nearest_obstacle({"a": math.inf, "b": -math.inf}) is None
-    assert len(ul.SENSOR_NAMES) == 8
+
+
+def test_sensor_layout():
+    assert ul.SENSOR_NAMES == [
+        "front_1", "front_2", "rear_1", "rear_2",
+        "left_1", "left_2", "right_1", "right_2"]
+    assert len(set(ul.SENSOR_NAMES)) == 8
+    assert ul.FRONT_NAMES + ul.REAR_NAMES + ul.LEFT_NAMES + \
+        ul.RIGHT_NAMES == ul.SENSOR_NAMES
