@@ -28,7 +28,6 @@ Rules for using them:
 
 ## Open items (do the first unchecked one)
 
-- [ ] 1. Ground-plane projection. Convert the detector's normalized floor point to base_link x, y metres using the camera pose and field of view above (see `REPO-REVIEW.md` on `docs/consolidated-state`; also look at the pixel-to-point code in `drivebase_behaviour` on `experimental/behaviour-coordinator`). Pure-Python module with tests. Add `base_x`, `base_y` to the `/vision/target` JSON without removing existing fields. Camera pose and field of view are parameters in `config/robot.yaml`. This fixes the camera/arm misalignment risk (RISKS.md #3).
 - [ ] 2. Behavior robustness. Apply the review in `docs/qa/2026-08-01-behaviour-coordinator-review.md` to our `behavior_logic.py`: every state has a timeout that returns to SEARCH, nothing busy-loops or blocks in a timer callback, no unused outputs. Add a test per state proving it cannot wedge the mission.
 - [ ] 3. Sim pickup-rate test. Extend the pure-Python sim (`sim_logic.py`) and add a CI test that runs the behavior logic against N scripted litter items and asserts a minimum collected fraction. Print the rate. This gives a repeatable software number toward the 80% target and a regression guard.
 - [ ] 4. Trial logging and summary. Log every pickup attempt (time, detected, approached, picked, success, litter type, failure reason) to JSON Lines from the behavior node, and add a script that prints pickup rate by litter type and per run. Needed for the field trials and the research question.
@@ -54,3 +53,4 @@ Rules for using them:
 - [x] 5. GPS/IMU node: publish NavSatFix and Imu (device model TODO: Bryan to fill in)
 - [x] 6. Behavior/state machine: search -> approach -> pick -> deposit, with obstacle avoidance
 - [x] 7. Simulation launch (Gazebo) and bringup launch file for the real robot
+- [x] 8. Ground-plane projection. Convert the detector's normalized floor point to base_link x, y metres using the camera pose and field of view above (see `REPO-REVIEW.md` on `docs/consolidated-state`; also look at the pixel-to-point code in `drivebase_behaviour` on `experimental/behaviour-coordinator`). Pure-Python module with tests. Add `base_x`, `base_y` to the `/vision/target` JSON without removing existing fields. Camera pose and field of view are parameters in `config/robot.yaml`. This fixes the camera/arm misalignment risk (RISKS.md #3). (Ported from the formula in REPO-REVIEW.md; `ground_projection.py`.)

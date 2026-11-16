@@ -21,3 +21,13 @@ gps_imu:
     gps_port: ""              # e.g. /dev/ttyAMA0
     gps_baud: 9600
     imu_model: ""             # "bno055" is the only backend so far
+detector:
+  ros__parameters:
+    # Camera pose for ground projection: from CAD V16-18 per STATE.md, not
+    # measured. TODO: Bryan to verify on the real robot.
+    camera_x_m: 0.248
+    camera_y_m: -0.1575
+    camera_height_m: 0.642    # 0.582 m above base_link + 0.060 m wheel radius
+    camera_pitch_deg: 35.0
+    camera_hfov_deg: 66.0
+    camera_vfov_deg: 41.0     # Camera Module 3 guess, check stream crop
