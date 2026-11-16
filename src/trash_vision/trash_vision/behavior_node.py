@@ -29,9 +29,10 @@ class BehaviorNode(Node):
         self._machine = bl.BehaviorMachine(params)
 
         self._target = None
-        self._target_stamp = 0.0
+        self._target_stamp = None
         self._ranges = {}
-        self._pending = None
+        self._stale_after = float(
+            self.get_parameter("target_stale_timeout").value)
 
         self._cmd_pub = self.create_publisher(Twist, "cmd_vel", 10)
         self._state_pub = self.create_publisher(String, "behavior/state", 10)
@@ -62,6 +63,7 @@ class BehaviorNode(Node):
             self._target = json.loads(msg.data)
         except ValueError:
             self._target = None
+        self._target_stamp = self._now()
 
     # Main loop:
     def _tick(self) -> None:
@@ -71,7 +73,9 @@ class BehaviorNode(Node):
         # Missing sensors read as 'inf' (nothing seen); see HARDWARE_TESTS.
         front = [self._ranges.get(n, float("inf")) for n in FRONT]
         rear = [self._ranges.get(n, float("inf")) for n in REAR]
-        cmd = self._machine.step(now, self._target, front, rear)
+        target = bl.fresh_target(
+            self._target, self._target_stamp, now, self._stale_after)
+        cmd = self._machine.step(now, target, front, rear)
         twist = Twist()
         twist.linear.x = float(cmd.linear)
         twist.angular.z = float(cmd.angular)
@@ -85,7 +89,7 @@ class BehaviorNode(Node):
         client = self._clients[action]
         if not client.service_is_ready():
             self.get_logger().error("arm/%s service not available" % action)
-            self._machine.arm_result(False, self._now())
+            self._machine.arm_result(False, self._now(), action)
             return
         future = client.call_async(Trigger.Request())
         future.add_done_callback(
@@ -100,7 +104,7 @@ class BehaviorNode(Node):
         except Exception as exc:
             self.get_logger().error("arm/%s failed: %s" % (action, exc))
             ok = False
-        self._machine.arm_result(ok, self._now())
+        self._machine.arm_result(ok, self._now(), action)
 
 
 # Main:

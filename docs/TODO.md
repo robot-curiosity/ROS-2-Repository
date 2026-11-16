@@ -28,7 +28,6 @@ Rules for using them:
 
 ## Open items (do the first unchecked one)
 
-- [ ] 2. Behavior robustness. Apply the review in `docs/qa/2026-08-01-behaviour-coordinator-review.md` to our `behavior_logic.py`: every state has a timeout that returns to SEARCH, nothing busy-loops or blocks in a timer callback, no unused outputs. Add a test per state proving it cannot wedge the mission.
 - [ ] 3. Sim pickup-rate test. Extend the pure-Python sim (`sim_logic.py`) and add a CI test that runs the behavior logic against N scripted litter items and asserts a minimum collected fraction. Print the rate. This gives a repeatable software number toward the 80% target and a regression guard.
 - [ ] 4. Trial logging and summary. Log every pickup attempt (time, detected, approached, picked, success, litter type, failure reason) to JSON Lines from the behavior node, and add a script that prints pickup rate by litter type and per run. Needed for the field trials and the research question.
 - [ ] 5. Detector latency. Read camera frames in a separate thread and keep only the newest frame, make the processing loop rate a parameter instead of a 1 ms timer, and publish the measured processing FPS (RISKS.md #11).
@@ -54,3 +53,4 @@ Rules for using them:
 - [x] 6. Behavior/state machine: search -> approach -> pick -> deposit, with obstacle avoidance
 - [x] 7. Simulation launch (Gazebo) and bringup launch file for the real robot
 - [x] 8. Ground-plane projection. Convert the detector's normalized floor point to base_link x, y metres using the camera pose and field of view above (see `REPO-REVIEW.md` on `docs/consolidated-state`; also look at the pixel-to-point code in `drivebase_behaviour` on `experimental/behaviour-coordinator`). Pure-Python module with tests. Add `base_x`, `base_y` to the `/vision/target` JSON without removing existing fields. Camera pose and field of view are parameters in `config/robot.yaml`. This fixes the camera/arm misalignment risk (RISKS.md #3). (Ported from the formula in REPO-REVIEW.md; `ground_projection.py`.)
+- [x] 9. Behavior robustness. Apply the review in `docs/qa/2026-08-01-behaviour-coordinator-review.md` to our `behavior_logic.py`: every state has a timeout that returns to SEARCH, nothing busy-loops or blocks in a timer callback, no unused outputs. Add a test per state proving it cannot wedge the mission. (Added approach timeout + cooldown, stale-detection and stale-arm-result guards; per-state tests in `test_behavior_logic.py`. Ported intent from the QA review F1/F4/F5: blocking waits/unused outputs were not present in our node.)
