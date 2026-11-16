@@ -30,7 +30,7 @@ from std_msgs.msg import String
 from ultralytics import YOLO
 
 # Logic:
-from trash_vision import detection_logic
+from trash_vision import detection_logic, ground_projection
 
 # OS:
 import os
@@ -88,6 +88,15 @@ class TrashDetector(Node):
                 ("gpt_fallback_interval_seconds", 5.0),
                 ("gpt_fallback_low_confidence", 0.30),
                 ("gpt_model", "gpt-4o"),
+
+                # Camera pose for ground projection (from CAD V16-18 per
+                # STATE.md, not measured; TODO: Bryan to verify):
+                ("camera_x_m", 0.248),
+                ("camera_y_m", -0.1575),
+                ("camera_height_m", 0.642),
+                ("camera_pitch_deg", 35.0),
+                ("camera_hfov_deg", 66.0),
+                ("camera_vfov_deg", 41.0),
             ],
         )
 
@@ -147,6 +156,10 @@ class TrashDetector(Node):
             self.get_parameter("gpt_fallback_low_confidence").value
         )
         self.gpt_model: str = str(self.get_parameter("gpt_model").value)
+        self.camera = ground_projection.camera_from_degrees(
+            *(float(self.get_parameter(n).value) for n in (
+                "camera_x_m", "camera_y_m", "camera_height_m",
+                "camera_pitch_deg", "camera_hfov_deg", "camera_vfov_deg")))
         self.gpt_last_call_time = -1e9
         self.gpt_busy = threading.Event()
         self.gpt_result = None
@@ -378,6 +391,8 @@ class TrashDetector(Node):
         floor_y = y2 / height
 
         horizontal_error = center_x - 0.5
+        floor_xy = ground_projection.floor_point_to_base(
+            floor_x, floor_y, self.camera)
 
         # Direction:
         direction = self.get_direction(horizontal_error)
@@ -431,6 +446,10 @@ class TrashDetector(Node):
 
             # Direction:
             "direction": direction,
+
+            # Floor point in base_link metres (None above the horizon):
+            "base_x": None if floor_xy is None else round(floor_xy[0], 4),
+            "base_y": None if floor_xy is None else round(floor_xy[1], 4),
         }
 
         # Target:
@@ -505,6 +524,7 @@ class TrashDetector(Node):
             box["x2"] * width, box["y2"] * height,
             width, height, box["confidence"],
             self.frame_number, self.deadband, source="gpt4o",
+            camera=self.camera,
         )
 
 

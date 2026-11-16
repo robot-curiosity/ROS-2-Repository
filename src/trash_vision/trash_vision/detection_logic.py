@@ -3,6 +3,8 @@ import base64
 import json
 import re
 
+from trash_vision import ground_projection
+
 GPT_PROMPT = (
     "You are the vision system of a litter-collecting robot. Find the single "
     "most prominent piece of litter on the ground in this image. Reply with "
@@ -21,9 +23,21 @@ def get_direction(horizontal_error, deadband):
     return "CENTER"
 
 
+def center_x_for_floor(x1, x2, width):
+    """Normalized horizontal centre of a box."""
+    return (x1 + x2) / 2.0 / width
+
+
 def build_target(x1, y1, x2, y2, width, height, confidence,
-                 frame_number, deadband, source="yolo"):
-    """Build the target dict published on /vision/target (pixel bbox in)."""
+                 frame_number, deadband, source="yolo", camera=None):
+    """Build the target dict published on /vision/target (pixel bbox in).
+
+    ``base_x``/``base_y`` are the floor point in base_link metres (None if
+    it is above the horizon). ``camera`` is a ground_projection.CameraModel
+    (CAD defaults when None).
+    """
+    floor_xy = ground_projection.floor_point_to_base(
+        center_x_for_floor(x1, x2, width), y2 / height, camera)
     center_x_pixels = (x1 + x2) / 2.0
     center_y_pixels = (y1 + y2) / 2.0
     center_x = center_x_pixels / width
@@ -44,6 +58,8 @@ def build_target(x1, y1, x2, y2, width, height, confidence,
             "x": round(center_x, 4), "y": round(y2 / height, 4)},
         "horizontal_error": round(horizontal_error, 4),
         "direction": direction,
+        "base_x": None if floor_xy is None else round(floor_xy[0], 4),
+        "base_y": None if floor_xy is None else round(floor_xy[1], 4),
     }
 
 
