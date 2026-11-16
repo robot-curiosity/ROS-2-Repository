@@ -1,34 +1,110 @@
-# Hardware parameters for the real robot. -1 / 0 / "" mean "not set yet":
-# the node idles with a warning. TODO: Bryan to fill in every value below.
+# ALL hardware values live in this one file. Fill them in as each part is
+# assembled, then run that subsystem's launch file (see docs/BRINGUP.md):
+#   ros2 launch trash_vision bringup_<drive|sonar|arm|camera|imu_gps>.launch.py
+# Marker for "not set yet": -1 (pin), 0 or 0.0 (number), "" (text). A node
+# with unset values idles and logs one warning naming the missing parameter.
+# Keys are the launch node names. TODO: Bryan to fill in every "unset" value.
 drive:
   ros__parameters:
-    pwm_pins: [-1, -1]        # BCM, [left, right]
-    dir_pins: [-1, -1]
-    enc_a_pins: [-1, -1]
-    enc_b_pins: [-1, -1]
-    ticks_per_rev: 0.0
-    wheel_radius_m: 0.0
-    track_width_m: 0.0
+    pwm_pins: [-1, -1]        # BCM pin numbers [left, right], MDD10A PWM input
+    dir_pins: [-1, -1]        # BCM pins [left, right], MDD10A DIR input
+    enc_a_pins: [-1, -1]      # BCM pins [left, right], encoder channel A
+    enc_b_pins: [-1, -1]      # BCM pins [left, right], encoder channel B
+    ticks_per_rev: 0.0        # encoder counts per WHEEL rev (after gearbox, x4); spin a wheel 10 turns by hand, divide
+    wheel_radius_m: 0.0       # metres; measure wheel diameter / 2 (CAD: 0.060, not measured)
+    track_width_m: 0.0        # metres between left and right wheel contact patches (CAD: 0.481, not measured)
+    max_wheel_speed_mps: 0.5  # m/s top wheel speed the controller will command
+    max_accel_mps2: 1.0       # m/s^2 acceleration limit
+    min_duty: 0.0             # 0..1 PWM duty needed to just start the wheel turning
+    kp: 0.5                   # speed PI controller proportional gain
+    ki: 1.0                   # speed PI controller integral gain
+    invert_left: false        # true if the left wheel spins backwards for +x
+    invert_right: false       # true if the right wheel spins backwards for +x
+    invert_enc_left: false    # true if odom x decreases when the left wheel rolls forward
+    invert_enc_right: false   # true if odom x decreases when the right wheel rolls forward
+    cmd_timeout_s: 0.5        # seconds without cmd_vel before motors stop
+    update_rate_hz: 50.0      # control loop rate
+    odom_frame: "odom"
+    base_frame: "base_link"
 ultrasonic:
   ros__parameters:
     # Order: front_1, front_2, rear_1, rear_2, left_1, left_2, right_1, right_2
-    trig_pins: [-1, -1, -1, -1, -1, -1, -1, -1]
-    echo_pins: [-1, -1, -1, -1, -1, -1, -1, -1]
+    trig_pins: [-1, -1, -1, -1, -1, -1, -1, -1]   # BCM pins, one per sensor in the order above
+    echo_pins: [-1, -1, -1, -1, -1, -1, -1, -1]   # BCM pins (5 V echo needs a divider first)
+    publish_rate_hz: 10.0     # Hz full-array publish rate
+    median_window: 3          # readings in the median filter
+    frame_prefix: "ultrasonic_"
 arm:
   ros__parameters:
-    port: ""                  # e.g. /dev/ttyACM0
+    port: ""                  # serial port of the SO101 follower, e.g. /dev/ttyACM0 (ls /dev/ttyACM*)
+    robot_id: "curiosity_follower"  # LeRobot calibration id
+    use_degrees: true         # joint units in degrees
+    joint_min: [-100.0, -100.0, -100.0, -100.0, -100.0, -100.0]  # lower limit per joint (calibrate)
+    joint_max: [100.0, 100.0, 100.0, 100.0, 100.0, 100.0]        # upper limit per joint (calibrate)
+    gripper_open: 50.0        # gripper value when open (calibrate)
+    gripper_closed: 0.0       # gripper value when closed (calibrate)
+    grasp_min_gap: 5.0        # gripper must stay open at least this much when holding a can
+    max_step: 3.0             # max joint change per step (degrees)
+    step_period_s: 0.05       # seconds per interpolation step
+    state_rate_hz: 10.0       # joint state publish rate
+    pose_stow: [0.0, -90.0, 90.0, 60.0, 0.0, 0.0]        # placeholder pose, calibrate
+    pose_pre_grasp: [0.0, -30.0, 60.0, 30.0, 0.0, 50.0]  # placeholder pose, calibrate
+    pose_grasp: [0.0, 0.0, 45.0, 20.0, 0.0, 50.0]        # placeholder pose, calibrate
+    pose_lift: [0.0, -40.0, 60.0, 30.0, 0.0, 0.0]        # placeholder pose, calibrate
+    pose_deposit: [90.0, -30.0, 60.0, 30.0, 0.0, 50.0]   # placeholder pose, calibrate
 gps_imu:
   ros__parameters:
-    gps_port: ""              # e.g. /dev/ttyAMA0
-    gps_baud: 9600
+    gps_port: ""              # GPS serial port, e.g. /dev/ttyAMA0
+    gps_baud: 9600            # GPS baud rate
+    gps_frame: "gps_link"
     imu_model: ""             # "bno055" is the only backend so far
+    imu_i2c_bus: 1            # I2C bus number (i2cdetect -y 1)
+    imu_i2c_addr: 40          # I2C address in decimal (BNO055 default 0x28 = 40)
+    imu_frame: "imu_link"
+    imu_rate_hz: 50.0         # IMU publish rate
 detector:
   ros__parameters:
+    model_path: "/home/christopherg/best_ncnn_model"  # YOLOv8 NCNN model folder on the Pi
+    camera_source: "tcp://127.0.0.1:8888"             # camera stream URL or device
+    confidence: 0.40          # minimum YOLO confidence 0..1
+    deadband: 0.12            # normalized horizontal error treated as centred
+    mapping_upload_url: "http://192.168.0.102:5000/frame"  # map server upload URL
+    mapping_enabled: true     # upload frames to the map server
+    mapping_interval_seconds: 2.0   # seconds between map uploads
+    mapping_jpeg_quality: 80        # JPEG quality 1..100 for uploads
+    gpt_fallback_enabled: false   # cloud vision stays off until on-device pickup works
+    gpt_fallback_interval_seconds: 5.0  # seconds between cloud fallback calls
+    gpt_fallback_low_confidence: 0.30     # YOLO confidence below which fallback is tried
+    gpt_model: "gpt-4o"   # cloud model name (key read from OPENAI_API_KEY)
     # Camera pose for ground projection: from CAD V16-18 per STATE.md, not
     # measured. TODO: Bryan to verify on the real robot.
-    camera_x_m: 0.248
-    camera_y_m: -0.1575
-    camera_height_m: 0.642    # 0.582 m above base_link + 0.060 m wheel radius
-    camera_pitch_deg: 35.0
-    camera_hfov_deg: 66.0
-    camera_vfov_deg: 41.0     # Camera Module 3 guess, check stream crop
+    camera_x_m: 0.248         # metres forward of base_link
+    camera_y_m: -0.1575       # metres left of base_link
+    camera_height_m: 0.642    # metres above floor (0.582 above base_link + 0.060 wheel radius)
+    camera_pitch_deg: 35.0    # degrees the camera looks down
+    camera_hfov_deg: 66.0     # horizontal field of view in degrees
+    camera_vfov_deg: 41.0     # vertical FOV, Camera Module 3 guess, check stream crop
+behavior:
+  ros__parameters:
+    enabled: false            # true lets the robot move; leave false until drive is tested
+    rate_hz: 10.0             # state machine rate
+    search_turn_speed: 0.5    # rad/s spin while searching
+    approach_speed: 0.2       # m/s forward speed while approaching
+    max_turn_speed: 0.8       # rad/s turn limit
+    turn_gain: 2.0            # rad/s per unit of normalized horizontal error
+    min_confidence: 0.3       # ignore detections below this
+    pick_floor_y: 0.85        # normalized image y of a can within arm reach; calibrate (can at pick spot, read /vision/target)
+    pick_center_tolerance: 0.12  # normalized x tolerance to start a pick; calibrate
+    target_lost_timeout: 1.5  # seconds of no detection before giving up
+    stop_distance: 0.25       # metres; front sonar closer than this stops/avoids
+    slow_distance: 0.6        # metres; front sonar closer than this slows down
+    avoid_turn_speed: 0.6     # rad/s avoidance turn
+    recover_backup_speed: 0.1 # m/s reversing speed in RECOVER
+    recover_backup_time: 1.5  # seconds reversing in RECOVER
+    rear_stop_distance: 0.25  # metres; rear sonar closer than this blocks reversing
+    side_clearance: 0.20      # metres; side sonar closer than this blocks spinning toward it (working value, tune)
+    pick_failures_before_recover: 2   # failed picks before RECOVER
+    arm_timeout: 30.0         # seconds before an arm action counts as failed
+    approach_timeout: 30.0    # seconds before APPROACH gives up
+    approach_cooldown: 3.0    # seconds detections are ignored after an approach timeout
+    target_stale_timeout: 1.0 # seconds before a /vision/target message counts as stale

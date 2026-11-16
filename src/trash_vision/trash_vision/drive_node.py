@@ -8,6 +8,7 @@ from geometry_msgs.msg import Twist
 from nav_msgs.msg import Odometry
 
 # Logic:
+from trash_vision import config_logic as cl
 from trash_vision import drive_logic as dl
 
 
@@ -66,9 +67,9 @@ class DriveNode(Node):
         self._odom_pub = self.create_publisher(Odometry, "odom", 10)
 
         if not self._ready:
-            self.get_logger().warning(
-                "Drive not configured (pins, ticks_per_rev, wheel_radius_m, "
-                "track_width_m); motors disabled. TODO: Bryan to fill in.")
+            self.get_logger().warning(cl.unset_message("drive", {
+                k: self.get_parameter(k).value for k in cl.REQUIRED["drive"]
+            }) or "Drive not configured; motors disabled.")
             return
 
         self._odom = dl.DiffDriveOdometry(

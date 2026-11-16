@@ -106,8 +106,8 @@ class ArmNode(Node):
         port = self.get_parameter("port").value
         if not port:
             self.get_logger().warning(
-                "No arm 'port' set; running dry-run (no motion). "
-                "TODO: Bryan to fill in the serial port.")
+                "arm idle: set port in config/robot.yaml (dry-run, no "
+                "motion). TODO: Bryan to fill in.")
             return DryRunBackend()
         try:
             return LeRobotBackend(

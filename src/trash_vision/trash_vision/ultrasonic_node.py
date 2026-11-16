@@ -7,6 +7,7 @@ from rclpy.node import Node
 from sensor_msgs.msg import Range
 
 # Logic:
+from trash_vision import config_logic as cl
 from trash_vision import ultrasonic_logic as ul
 
 
@@ -34,9 +35,10 @@ class UltrasonicArray(Node):
         if problems:
             configured = []
         if not configured:
-            self.get_logger().warning(
-                "No ultrasonic pins configured (trig_pins/echo_pins); "
-                "node idle. TODO: Bryan to fill in pins.")
+            self.get_logger().warning(cl.unset_message("ultrasonic", {
+                k: self.get_parameter(k).value
+                for k in cl.REQUIRED["ultrasonic"]
+            }) or "No ultrasonic sensors configured; node idle.")
 
         self._sensors = []
         for cfg in configured:
