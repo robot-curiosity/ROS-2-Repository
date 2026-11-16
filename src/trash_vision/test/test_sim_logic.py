@@ -63,3 +63,26 @@ def test_pick_out_of_reach_fails():
     w = sl.SimWorld(4, 4, [(3.5, 2.0)], x=2, y=2, yaw=0)
     assert w.pick()[0] is False
     assert w.litter
+
+
+def test_sensor_layout_names():
+    assert sorted(sl.SENSOR_BEARINGS) == sorted(
+        ["front_1", "front_2", "rear_1", "rear_2",
+         "left_1", "left_2", "right_1", "right_2"])
+    assert abs(sl.SENSOR_BEARINGS["left_1"] - math.pi / 2) < 1e-9
+    assert abs(sl.SENSOR_BEARINGS["right_2"] + math.pi / 2) < 1e-9
+
+
+def test_side_sensors_see_walls_with_stagger():
+    w = sl.SimWorld(4, 4, x=2, y=0.5, yaw=0)  # right wall (y=0) 0.5 m away
+    r = w.ranges()
+    assert abs(r["right_1"] - 0.5) < 1e-9 and abs(r["right_2"] - 0.5) < 1e-9
+    assert r["left_1"] == float("inf")
+    w = sl.SimWorld(4, 4, x=3.5, y=2, yaw=math.pi / 2)  # facing +y
+    # Robot's left now points to -x: wall at x=0 is 3.5 m away -> out of range
+    assert w.ranges()["left_1"] == float("inf")
+    # Facing +y, the robot's right points to +x: wall 0.5 m away.
+    assert abs(w.ranges()["right_1"] - 0.5) < 1e-9
+    # Stagger moves the origin along heading (+y here), not across the wall.
+    near = sl.SimWorld(4, 4, x=2, y=3.95, yaw=0)
+    assert abs(near.range_at(math.pi / 2, 0.10, 0.0) - 0.05) < 1e-9

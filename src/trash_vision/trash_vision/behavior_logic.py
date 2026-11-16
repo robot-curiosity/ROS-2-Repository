@@ -28,6 +28,10 @@ DEFAULTS = {
     "recover_backup_speed": 0.1,
     "recover_backup_time": 1.5,
     "rear_stop_distance": 0.25,
+    # Pure rotation in place swings the robot's corners sideways. Refuse to
+    # spin toward a side whose sonar reads closer than this. Working value,
+    # TODO: Bryan to tune once the side sonars are mounted.
+    "side_clearance": 0.20,
     "pick_failures_before_recover": 2,
     "arm_timeout": 30.0,
     # APPROACH must reach the pick zone within this time or give up (blocked
@@ -102,6 +106,7 @@ class BehaviorMachine:
         self._requested = False
         self._avoid_dir = 1.0
         self._ignore_until = -math.inf
+        self._last_front_min = math.inf
 
     _ARM_STATE = {"pick": PICK, "deposit": DEPOSIT, "stow": STOW}
 
@@ -149,9 +154,40 @@ class BehaviorMachine:
             return (nearest - stop) / (slow - stop), 0.0
         return 1.0, 0.0
 
-    def step(self, now, target, front, rear):
-        """Advance one tick and return a Command."""
+    def step(self, now, target, front, rear, left=None, right=None):
+        """Advance one tick and return a Command.
+
+        front/rear/left/right are lists of sonar ranges (front ordered left to
+        right). left/right default to "nothing seen" so older callers work.
+        """
+        cmd = self._step(now, target, front, rear)
+        return self._limit_spin(cmd, left, right)
+
+    def _limit_spin(self, cmd, left, right):
+        """Refuse pure rotation toward a side that has no clearance.
+
+        Counter-clockwise (angular > 0) swings into the left side, clockwise
+        into the right. In SEARCH the spin direction is flipped if the other
+        side is clear and nothing is in front; otherwise the spin is zeroed.
+        """
+        if cmd.arm_action or cmd.angular == 0.0 or abs(cmd.linear) >= 0.02:
+            return cmd
+        clearance = self.p["side_clearance"]
+        left_min = min_range(left or [])
+        right_min = min_range(right or [])
+        into = left_min if cmd.angular > 0 else right_min
+        if into >= clearance:
+            return cmd
+        away = right_min if cmd.angular > 0 else left_min
+        front_ok = self._last_front_min > self.p["stop_distance"]
+        if self.state == SEARCH and away >= clearance and front_ok:
+            self._avoid_dir = -1.0 if cmd.angular > 0 else 1.0
+            return Command(0.0, -cmd.angular)
+        return Command(0.0, 0.0)
+
+    def _step(self, now, target, front, rear):
         p = self.p
+        self._last_front_min = min_range(front)
         if self.state in (PICK, DEPOSIT, STOW):
             return self._arm_step(now)
         if self.state == RECOVER:

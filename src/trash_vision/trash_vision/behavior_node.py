@@ -11,9 +11,12 @@ from std_srvs.srv import Trigger
 
 # Logic:
 from trash_vision import behavior_logic as bl
+from trash_vision import ultrasonic_logic as ul
 
-FRONT = ["front_%d" % i for i in range(1, 5)]
-REAR = ["rear_%d" % i for i in range(1, 5)]
+FRONT = ul.FRONT_NAMES
+REAR = ul.REAR_NAMES
+LEFT = ul.LEFT_NAMES
+RIGHT = ul.RIGHT_NAMES
 
 
 # Behavior node:
@@ -38,7 +41,7 @@ class BehaviorNode(Node):
         self._state_pub = self.create_publisher(String, "behavior/state", 10)
         self.create_subscription(
             String, "/vision/target", self._on_target, 10)
-        for name in FRONT + REAR:
+        for name in FRONT + REAR + LEFT + RIGHT:
             self.create_subscription(
                 Range, "/ultrasonic/" + name,
                 lambda msg, n=name: self._ranges.__setitem__(n, msg.range),
@@ -75,7 +78,9 @@ class BehaviorNode(Node):
         rear = [self._ranges.get(n, float("inf")) for n in REAR]
         target = bl.fresh_target(
             self._target, self._target_stamp, now, self._stale_after)
-        cmd = self._machine.step(now, target, front, rear)
+        left = [self._ranges.get(n, float("inf")) for n in LEFT]
+        right = [self._ranges.get(n, float("inf")) for n in RIGHT]
+        cmd = self._machine.step(now, target, front, rear, left, right)
         twist = Twist()
         twist.linear.x = float(cmd.linear)
         twist.angular.z = float(cmd.angular)
