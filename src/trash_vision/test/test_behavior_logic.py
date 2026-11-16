@@ -106,3 +106,111 @@ def test_arm_timeout_counts_as_failure():
     m.step(0.1, tgt(y=0.95), CLEAR, CLEAR)
     m.step(100.0, None, CLEAR, CLEAR)
     assert m.state == bl.SEARCH
+
+
+# --- Wedge-proofing: every state must return to SEARCH on its own ---------
+BLOCKED = [0.1] * 4
+# Never reaches the pick zone: target visible but floor y stays small.
+FAR = dict(err=0.0, y=0.3)
+
+
+def _drive_until_search(m, start, end, target, front=CLEAR, rear=CLEAR,
+                        dt=0.5):
+    t = start
+    while t <= end:
+        m.step(t, target() if callable(target) else target, front, rear)
+        if m.state == bl.SEARCH:
+            return t
+        t += dt
+    return None
+
+
+def test_search_is_home_state_and_never_requests_arm():
+    m = bl.BehaviorMachine()
+    for i in range(200):
+        c = m.step(i * 0.5, None, CLEAR, CLEAR)
+        assert m.state == bl.SEARCH and c.arm_action is None
+
+
+def test_approach_blocked_by_obstacle_times_out_to_search():
+    m = bl.BehaviorMachine()
+    m.step(0.0, tgt(**FAR), CLEAR, CLEAR)
+    assert m.state == bl.APPROACH
+    t = _drive_until_search(
+        m, 0.5, 60.0, lambda: tgt(**FAR), front=BLOCKED)
+    assert t is not None and t <= m.p["approach_timeout"] + 1.0
+
+
+def test_approach_never_reaching_pick_zone_times_out():
+    m = bl.BehaviorMachine()
+    t = _drive_until_search(m, 0.0, 60.0, lambda: tgt(**FAR))
+    assert t is not None
+
+
+def test_approach_cooldown_ignores_same_target_then_resumes():
+    m = bl.BehaviorMachine()
+    t = _drive_until_search(m, 0.0, 60.0, lambda: tgt(**FAR))
+    m.step(t + 0.5, tgt(**FAR), CLEAR, CLEAR)
+    assert m.state == bl.SEARCH
+    m.step(t + m.p["approach_cooldown"] + 0.5, tgt(**FAR), CLEAR, CLEAR)
+    assert m.state == bl.APPROACH
+
+
+def test_pick_deposit_stow_each_time_out_to_search():
+    for state, setup in ((bl.PICK, 0), (bl.DEPOSIT, 1), (bl.STOW, 2)):
+        m = bl.BehaviorMachine()
+        m.step(0.0, tgt(y=0.95), CLEAR, CLEAR)
+        m.step(0.1, tgt(y=0.95), CLEAR, CLEAR)
+        if setup >= 1:
+            m.arm_result(True, 1.0)
+        if setup >= 2:
+            m.arm_result(True, 2.0)
+        assert m.state == state
+        t = 3.0
+        # Arm service never answers: walk the clock forward.
+        while m.state == state and t < 200.0:
+            m.step(t, None, CLEAR, CLEAR)
+            t += 1.0
+        assert m.state != state, state
+        # Whatever the path (RECOVER included) it must reach SEARCH.
+        while m.state != bl.SEARCH and t < 400.0:
+            m.step(t, None, CLEAR, CLEAR)
+            t += 1.0
+        assert m.state == bl.SEARCH, state
+
+
+def test_recover_returns_to_search_by_time_and_by_rear_sensor():
+    for rear, expect_t in ((CLEAR, 1.5), ([0.1] * 4, 0.0)):
+        m = bl.BehaviorMachine()
+        m._enter(bl.RECOVER, 0.0)
+        t = 0.0
+        while m.state == bl.RECOVER and t < 10.0:
+            m.step(t, None, CLEAR, rear)
+            t += 0.5
+        assert m.state == bl.SEARCH and t - 0.5 <= expect_t + 0.5
+
+
+def test_stale_arm_result_after_timeout_is_ignored():
+    m = bl.BehaviorMachine()
+    m.step(0.0, tgt(y=0.95), CLEAR, CLEAR)
+    m.step(0.1, tgt(y=0.95), CLEAR, CLEAR)
+    m.step(100.0, None, CLEAR, CLEAR)  # pick timed out -> SEARCH
+    assert m.state == bl.SEARCH
+    m.arm_result(True, 101.0, "pick")  # late reply
+    assert m.state == bl.SEARCH and m.items_collected == 0
+
+
+def test_stale_result_for_other_phase_does_not_advance():
+    m = bl.BehaviorMachine()
+    m.step(0.0, tgt(y=0.95), CLEAR, CLEAR)
+    m.step(0.1, tgt(y=0.95), CLEAR, CLEAR)
+    m.arm_result(True, 1.0, "deposit")
+    assert m.state == bl.PICK
+
+
+def test_fresh_target_drops_stale_detection():
+    t = tgt()
+    assert bl.fresh_target(t, 10.0, 10.5, 1.0) is t
+    assert bl.fresh_target(t, 10.0, 12.0, 1.0) is None
+    assert bl.fresh_target(t, None, 12.0, 1.0) is None
+    assert bl.fresh_target(None, 10.0, 10.1, 1.0) is None

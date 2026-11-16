@@ -30,7 +30,22 @@ DEFAULTS = {
     "rear_stop_distance": 0.25,
     "pick_failures_before_recover": 2,
     "arm_timeout": 30.0,
+    # APPROACH must reach the pick zone within this time or give up (blocked
+    # by an obstacle, unreachable target, never centering).
+    "approach_timeout": 30.0,
+    # After an approach timeout, ignore detections this long so the robot
+    # spins away instead of re-entering APPROACH on the same target.
+    "approach_cooldown": 3.0,
+    # Detections older than this are treated as absent (detector died).
+    "target_stale_timeout": 1.0,
 }
+
+
+def fresh_target(target, stamp, now, max_age):
+    """Return target if it was received within max_age seconds, else None."""
+    if target is None or stamp is None or now - stamp > max_age:
+        return None
+    return target
 
 
 class Command:
@@ -86,14 +101,24 @@ class BehaviorMachine:
         self._pick_failures = 0
         self._requested = False
         self._avoid_dir = 1.0
+        self._ignore_until = -math.inf
+
+    _ARM_STATE = {"pick": PICK, "deposit": DEPOSIT, "stow": STOW}
 
     def _enter(self, state, now):
         self.state = state
         self._state_start = now
         self._requested = False
 
-    def arm_result(self, success, now):
-        """Report the result of the arm service requested earlier."""
+    def arm_result(self, success, now, action=None):
+        """Report the result of the arm service requested earlier.
+
+        If action is given and does not belong to the current state, the
+        result is stale (the state already timed out) and is ignored, so a
+        late reply cannot advance or count a different phase.
+        """
+        if action is not None and self._ARM_STATE.get(action) != self.state:
+            return
         if self.state == PICK:
             if success:
                 self._pick_failures = 0
@@ -132,6 +157,8 @@ class BehaviorMachine:
         if self.state == RECOVER:
             return self._recover_step(now, rear)
 
+        if now < self._ignore_until:
+            target = None
         if valid_target(target, p["min_confidence"]):
             self._last_seen = now
             self._last_target = target
@@ -141,6 +168,11 @@ class BehaviorMachine:
         if self.state == SEARCH and seen:
             self._enter(APPROACH, now)
         if self.state == APPROACH and not seen:
+            self._enter(SEARCH, now)
+        elif (self.state == APPROACH
+                and now - self._state_start > p["approach_timeout"]):
+            self._ignore_until = now + p["approach_cooldown"]
+            self._last_seen = -math.inf
             self._enter(SEARCH, now)
 
         if self.state == SEARCH:
