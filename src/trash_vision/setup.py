@@ -35,6 +35,7 @@ setup(
             "gps_imu = trash_vision.gps_imu_node:main",
             "behavior = trash_vision.behavior_node:main",
             "sim = trash_vision.sim_node:main",
+            "hardware_check = trash_vision.hardware_check:main",
         ],
     },
 )
