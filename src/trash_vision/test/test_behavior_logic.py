@@ -280,3 +280,17 @@ def test_recover_backs_up_using_rear_not_front():
     m._enter(bl.RECOVER, 0.0)
     c = m.step(0.1, None, [0.05, 0.05], CLEAR, NEAR, NEAR)
     assert c.linear < 0 and m.state == bl.RECOVER
+
+
+def test_stale_front_sonar_stops_forward_motion():
+    from trash_vision import sonar_scheduler as ss
+    names = ["front_1", "front_2"]
+    ranges = {"front_1": 2.0, "front_2": 2.0}
+
+    def drive(stamps):
+        m = bl.BehaviorMachine()
+        front = ss.apply_staleness(names, ranges, stamps, 10.0, 2.0)
+        return m.step(10.0, tgt(), front, CLEAR)
+
+    assert drive({"front_1": 9.9, "front_2": 9.9}).linear > 0.0
+    assert drive({"front_1": 5.0, "front_2": 9.9}).linear <= 0.0

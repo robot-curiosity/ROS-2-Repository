@@ -294,7 +294,8 @@ def sonar(argv=None):
     for n in ul.SENSOR_NAMES:
         node.create_subscription(
             Range, "/ultrasonic/" + n,
-            lambda m, n=n: series[n].append(m.range), 10)
+            lambda m, n=n: series[n].append(
+                float("inf") if m.range >= m.max_range else m.range), 10)
     print("Sampling %g s with nothing near the robot..." % a.seconds)
     _spin_for(node, a.seconds)
     status = cl.analyze_sonar(series)

@@ -1,5 +1,5 @@
 # Imports:
-import math
+import time
 
 # ROS:
 import rclpy
@@ -8,6 +8,7 @@ from sensor_msgs.msg import Range
 
 # Logic:
 from trash_vision import config_logic as cl
+from trash_vision import sonar_scheduler as ss
 from trash_vision import ultrasonic_logic as ul
 
 
@@ -21,7 +22,10 @@ class UltrasonicArray(Node):
         # TODO: Bryan to fill in the real BCM GPIO pins (-1 = sensor unused).
         self.declare_parameter("trig_pins", [-1] * n)
         self.declare_parameter("echo_pins", [-1] * n)
-        self.declare_parameter("publish_rate_hz", 10.0)
+        # Gap between pings; sensors are fired one at a time, round-robin.
+        self.declare_parameter("settle_gap_s", 0.06)
+        # Longest wait for an echo per sensor (4 m round trip is ~23 ms).
+        self.declare_parameter("echo_timeout_s", 0.025)
         self.declare_parameter("median_window", 3)
         self.declare_parameter("frame_prefix", "ultrasonic_")
 
@@ -54,43 +58,57 @@ class UltrasonicArray(Node):
                     Range, "ultrasonic/" + cfg["name"], 10),
             })
 
-        rate = float(self.get_parameter("publish_rate_hz").value)
-        self.create_timer(1.0 / max(rate, 0.1), self._tick)
+        self._sched = ss.SonarScheduler(
+            [s["name"] for s in self._sensors],
+            self.get_parameter("settle_gap_s").value)
+        self._by_name = {s["name"]: s for s in self._sensors}
+        self._timeout = float(self.get_parameter("echo_timeout_s").value)
+        self.create_timer(0.005, self._tick)
 
     # Open one sensor:
     def _open_sensor(self, cfg):
         try:
-            from gpiozero import DistanceSensor
-            return DistanceSensor(
-                echo=cfg["echo"], trigger=cfg["trig"],
-                max_distance=ul.HC_SR04_MAX_RANGE_M)
+            from gpiozero import DigitalInputDevice, DigitalOutputDevice
+            return {
+                "trig": DigitalOutputDevice(cfg["trig"]),
+                "echo": DigitalInputDevice(cfg["echo"]),
+            }
         except Exception as exc:
             self.get_logger().error(
                 "Cannot open %s (trig %d, echo %d): %s"
                 % (cfg["name"], cfg["trig"], cfg["echo"], exc))
             return None
 
-    # Read and publish:
+    # Fire one sensor and read its echo:
+    def _ping(self, device):
+        device["trig"].on()
+        time.sleep(1e-5)
+        device["trig"].off()
+        return ss.measure_echo(
+            lambda: device["echo"].value, time.perf_counter, self._timeout)
+
+    # Fire the next sensor when the settle gap has passed:
     def _tick(self) -> None:
-        stamp = self.get_clock().now().to_msg()
-        prefix = self.get_parameter("frame_prefix").value
-        for s in self._sensors:
-            try:
-                raw = s["device"].distance * ul.HC_SR04_MAX_RANGE_M
-            except Exception:
-                raw = None
-            rng = ul.classify_range(raw)
-            if math.isfinite(rng):
-                rng = s["filter"].update(rng)
-            msg = Range()
-            msg.header.stamp = stamp
-            msg.header.frame_id = prefix + s["name"]
-            msg.radiation_type = Range.ULTRASOUND
-            msg.field_of_view = 0.26  # ~15 deg, HC-SR04 datasheet
-            msg.min_range = ul.HC_SR04_MIN_RANGE_M
-            msg.max_range = ul.HC_SR04_MAX_RANGE_M
-            msg.range = float(rng)
-            s["pub"].publish(msg)
+        name = self._sched.next_due(time.monotonic())
+        if name is None:
+            return
+        s = self._by_name[name]
+        try:
+            pulse = self._ping(s["device"])
+        except Exception:
+            pulse = None
+        self._sched.fired(time.monotonic())
+        rng, _status = ss.validate_range(pulse)
+        rng = s["filter"].update(rng)
+        msg = Range()
+        msg.header.stamp = self.get_clock().now().to_msg()
+        msg.header.frame_id = self.get_parameter("frame_prefix").value + name
+        msg.radiation_type = Range.ULTRASOUND
+        msg.field_of_view = 0.26  # ~15 deg, HC-SR04 datasheet
+        msg.min_range = ul.HC_SR04_MIN_RANGE_M
+        msg.max_range = ul.HC_SR04_MAX_RANGE_M
+        msg.range = float(rng)
+        s["pub"].publish(msg)
 
 
 def main(args=None) -> None:
