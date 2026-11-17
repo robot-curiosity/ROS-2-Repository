@@ -111,3 +111,15 @@ behavior:
     approach_cooldown: 3.0    # seconds detections are ignored after an approach timeout
     target_stale_timeout: 1.0 # seconds before a /vision/target message counts as stale
     sonar_stale_timeout: 2.0  # seconds before a sonar that reported earlier counts as blocked (full 8-sensor round takes ~0.7 s)
+    # Search pattern (lawnmower rows driven by odometry; origin = robot start pose)
+    search_pattern: "lawnmower"   # "lawnmower" or "spin" (old behavior, no odometry)
+    search_area_length: 4.0   # metres along the start heading; TODO: Bryan, measure the test field
+    search_area_width: 4.0    # metres across the start heading; TODO: Bryan, measure the test field
+    search_edge_margin: 0.3   # metres kept clear of the area edge
+    search_row_spacing: 0.0   # metres between rows; 0 = derive from field of view and detect range
+    search_detect_range: 1.5  # metres at which a can is reliably detected; guess, check with the detector
+    search_row_overlap: 0.2   # fraction (0-0.9) neighbouring sweeps overlap
+    search_camera_hfov_deg: 66.0  # degrees; from CAD V16-18 per STATE.md, not measured
+    search_speed: 0.2         # m/s along a row
+    search_waypoint_tolerance: 0.15  # metres; waypoint counts as reached
+    search_stuck_timeout: 10.0  # seconds without progress before a waypoint is skipped

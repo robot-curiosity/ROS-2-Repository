@@ -1,11 +1,13 @@
 # Imports:
 import json
+import math
 import os
 import time
 
 # ROS:
 import rclpy
 from geometry_msgs.msg import Twist
+from nav_msgs.msg import Odometry
 from rclpy.node import Node
 from sensor_msgs.msg import Range
 from std_msgs.msg import String
@@ -39,6 +41,8 @@ class BehaviorNode(Node):
         self._recorder = self._make_recorder()
         self._target = None
         self._target_stamp = None
+        self._pose = None
+        self._pose_stamp = None
         self._ranges = {}
         self._range_stamps = {}
         self._stale_after = float(
@@ -48,6 +52,7 @@ class BehaviorNode(Node):
         self._state_pub = self.create_publisher(String, "behavior/state", 10)
         self.create_subscription(
             String, "/vision/target", self._on_target, 10)
+        self.create_subscription(Odometry, "odom", self._on_odom, 10)
         for name in FRONT + REAR + LEFT + RIGHT:
             self.create_subscription(
                 Range, "/ultrasonic/" + name,
@@ -87,6 +92,15 @@ class BehaviorNode(Node):
         self._ranges[name] = value
         self._range_stamps[name] = self._now()
 
+    # Odometry callback (pose for the search pattern):
+    def _on_odom(self, msg) -> None:
+        q = msg.pose.pose.orientation
+        yaw = math.atan2(2.0 * (q.w * q.z + q.x * q.y),
+                         1.0 - 2.0 * (q.y * q.y + q.z * q.z))
+        pos = msg.pose.pose.position
+        self._pose = (pos.x, pos.y, yaw)
+        self._pose_stamp = self._now()
+
     # Target callback:
     def _on_target(self, msg) -> None:
         try:
@@ -114,7 +128,12 @@ class BehaviorNode(Node):
             self._target, self._target_stamp, now, self._stale_after)
         left = sonars(LEFT)
         right = sonars(RIGHT)
-        cmd = self._machine.step(now, target, front, rear, left, right)
+        # Without fresh odometry (drive node off) SEARCH falls back to spinning.
+        pose = self._pose
+        if self._pose_stamp is None or now - self._pose_stamp > 1.0:
+            pose = None
+        cmd = self._machine.step(
+            now, target, front, rear, left, right, pose=pose)
         if self._recorder:
             self._recorder.update(now, target or self._target)
         twist = Twist()
