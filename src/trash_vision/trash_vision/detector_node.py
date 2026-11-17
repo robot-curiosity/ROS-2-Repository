@@ -24,13 +24,13 @@ import rclpy
 from rclpy.node import Node
 
 # Standard:
-from std_msgs.msg import String
+from std_msgs.msg import Float32, String
 
 # Ultralytics:
 from ultralytics import YOLO
 
 # Logic:
-from trash_vision import detection_logic, ground_projection
+from trash_vision import detection_logic, frame_grabber, ground_projection
 
 # OS:
 import os
@@ -64,6 +64,9 @@ class TrashDetector(Node):
 
                 # Confidence:
                 ("confidence", 0.40),
+
+                # Processing rate cap in Hz (frames are always the newest):
+                ("process_rate_hz", 10.0),
 
                 # Deadband:
                 ("deadband", 0.12),
@@ -114,6 +117,11 @@ class TrashDetector(Node):
         # Confidence:
         self.confidence: float = float(
             self.get_parameter("confidence").value
+        )
+
+        # Processing rate:
+        self.process_rate_hz: float = float(
+            self.get_parameter("process_rate_hz").value
         )
 
         # Deadband:
@@ -185,7 +193,12 @@ class TrashDetector(Node):
             10,
         )
 
-        # 
+        # Measured processing rate:
+        self.fps_publisher = self.create_publisher(
+            Float32, "/vision/fps", 10
+        )
+
+        # Direction:
         self.direction_publisher = self.create_publisher(
             # Message:
             String,
@@ -211,11 +224,11 @@ class TrashDetector(Node):
             f"Opening camera source: {camera_source}"
         )
 
-        # Camera:
-        self.camera = cv2.VideoCapture(camera_source)
+        # Camera (self.camera is the ground-projection pose):
+        self.capture = cv2.VideoCapture(camera_source)
 
         # Validation:
-        if not self.camera.isOpened():
+        if not self.capture.isOpened():
             raise RuntimeError(
                 f"Could not open camera source: {camera_source}"
             )
@@ -254,10 +267,17 @@ class TrashDetector(Node):
         # Thread:
         self.mapping_thread.start()
 
+        # Newest-frame reader thread and processing-rate meter:
+        self.grabber = frame_grabber.FrameGrabber(self.capture.read)
+        self.grabber.start()
+        self.rate_meter = frame_grabber.RateMeter(window_s=2.0)
+        self.last_fps_publish = 0.0
+        self.last_frame_seq = 0
+
         # Timer:
         self.timer = self.create_timer(
-            # Frequency:
-            0.001,
+            # Period from process_rate_hz (clamped 0.5..60 Hz):
+            frame_grabber.timer_period_s(self.process_rate_hz),
 
             # Function:
             self.process_frame,
@@ -283,16 +303,15 @@ class TrashDetector(Node):
 
     # Methods:
     def process_frame(self) -> None:
-        # Variables (Assignment):
-        # Success, Frame:
-        success, frame = self.camera.read()
+        # Newest frame from the reader thread (None if no new one):
+        taken = self.grabber.latest.take()
 
         # Validation:
-        if not success:
+        if taken is None:
             # Logger:
             self.get_logger().warning(
                 # Message:
-                "Camera frame unavailable",
+                "No new camera frame",
 
                 # Throttle:
                 throttle_duration_sec=2.0,
@@ -302,6 +321,8 @@ class TrashDetector(Node):
             return
 
         # Variables (Assignment):
+        frame = taken[0]
+
         # Frame:
         self.frame_number += 1
 
@@ -585,13 +606,21 @@ class TrashDetector(Node):
         # Confidence:
         confidence: float | None = None,
     ) -> None:
-        # Validation:
-        if self.fps_frame_count < 30:
-            return
-
         # Variables (Assignment):
         # Time:
         current_time = time.monotonic()
+
+        # Measured rate over a sliding window, published about once a second:
+        self.rate_meter.tick(current_time)
+        if current_time - self.last_fps_publish >= 1.0:
+            self.last_fps_publish = current_time
+            fps_message = Float32()
+            fps_message.data = float(self.rate_meter.rate(current_time))
+            self.fps_publisher.publish(fps_message)
+
+        # Validation:
+        if self.fps_frame_count < 30:
+            return
 
         # Elapsed:
         elapsed_time = (
@@ -852,8 +881,9 @@ class TrashDetector(Node):
             )
 
         # Camera:
-        if self.camera.isOpened():
-            self.camera.release()
+        self.grabber.stop()
+        if self.capture.isOpened():
+            self.capture.release()
 
         # Node:
         super().destroy_node()
