@@ -4,6 +4,8 @@ All distances in metres, speeds in m/s and rad/s, times in seconds.
 """
 import math
 
+from trash_vision import search_pattern as sp
+
 SEARCH = "SEARCH"
 APPROACH = "APPROACH"
 PICK = "PICK"
@@ -46,6 +48,9 @@ DEFAULTS = {
     # blocked (range 0). One full round of 8 sensors takes about 0.7 s.
     "sonar_stale_timeout": 2.0,
 }
+# Search pattern parameters live in search_pattern.DEFAULTS (same flat
+# namespace, so the node declares them together with the ones above).
+DEFAULTS.update(sp.DEFAULTS)
 
 
 def fresh_target(target, stamp, now, max_age):
@@ -112,6 +117,15 @@ class BehaviorMachine:
         self._last_front_min = math.inf
         # Why the last attempt ended badly (read by trial_log.TrialRecorder).
         self.reason = None
+        self._search = sp.LawnmowerSearch(self.p)
+        self._pattern_active = False
+        self._was_searching = False
+        self._pose = None
+
+    @property
+    def search(self):
+        """The LawnmowerSearch (waypoints, laps, skipped) for logs/tests."""
+        return self._search
 
     _ARM_STATE = {"pick": PICK, "deposit": DEPOSIT, "stow": STOW}
 
@@ -161,12 +175,15 @@ class BehaviorMachine:
             return (nearest - stop) / (slow - stop), 0.0
         return 1.0, 0.0
 
-    def step(self, now, target, front, rear, left=None, right=None):
+    def step(self, now, target, front, rear, left=None, right=None,
+             pose=None):
         """Advance one tick and return a Command.
 
         front/rear/left/right are lists of sonar ranges (front ordered left to
         right). left/right default to "nothing seen" so older callers work.
+        pose is odometry (x, y, yaw); without it SEARCH just spins.
         """
+        self._pose = pose
         cmd = self._step(now, target, front, rear)
         return self._limit_spin(cmd, left, right)
 
@@ -187,7 +204,8 @@ class BehaviorMachine:
             return cmd
         away = right_min if cmd.angular > 0 else left_min
         front_ok = self._last_front_min > self.p["stop_distance"]
-        if self.state == SEARCH and away >= clearance and front_ok:
+        if (self.state == SEARCH and away >= clearance and front_ok
+                and not self._pattern_active):
             self._avoid_dir = -1.0 if cmd.angular > 0 else 1.0
             return Command(0.0, -cmd.angular)
         return Command(0.0, 0.0)
@@ -220,9 +238,20 @@ class BehaviorMachine:
             self._last_seen = -math.inf
             self._enter(SEARCH, now)
 
+        self._pattern_active = False
+        if self.state != SEARCH:
+            self._was_searching = False
         if self.state == SEARCH:
             if scale == 0.0:
+                self._search.note_blocked(now)
                 return Command(0.0, avoid_turn)
+            if p["search_pattern"] == "lawnmower" and self._pose:
+                if not self._was_searching:
+                    self._search.reset_progress(now)
+                self._was_searching = True
+                self._pattern_active = True
+                lin, ang = self._search.step(self._pose, now)
+                return Command(lin * scale, ang)
             # Spin to look around; obstacle ahead slows nothing (no motion).
             return Command(0.0, p["search_turn_speed"] * self._avoid_dir)
 

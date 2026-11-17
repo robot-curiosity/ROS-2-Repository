@@ -4,6 +4,7 @@ No ROS needed. Gives a repeatable "collected fraction" for CI and for
 tracking the 80% pickup target in software (not a real-robot number).
 """
 from trash_vision import behavior_logic as bl
+from trash_vision import search_pattern as sp
 from trash_vision import sim_logic as sl
 from trash_vision import trial_log as tl
 
@@ -20,23 +21,52 @@ WALL_LITTER = [(0.3, 2.0), (3.7, 1.5), (2.0, 0.3), (1.0, 3.7)]
 CORNER_LITTER = [(0.15, 0.15), (3.85, 3.85), (0.2, 3.0), (3.8, 0.8)]
 
 
+class CoverageGrid:
+    """Tracks how much of the search area the simulated camera has swept."""
+
+    def __init__(self, world, p):
+        half_l = p["search_area_length"] / 2.0
+        half_w = p["search_area_width"] / 2.0
+        self._cx, self._cy = world.x, world.y
+        self.grid = sp.CoverageGrid(-half_l, half_l, -half_w, half_w)
+        self._range = p["search_detect_range"]
+        self._hfov = p["search_camera_hfov_deg"]
+
+    def update(self, world):
+        self.grid.mark((world.x - self._cx, world.y - self._cy, world.yaw),
+                       self._range, self._hfov)
+
+    def fraction(self):
+        return self.grid.fraction()
+
+
+def run_search_only(duration=300.0, **kwargs):
+    """No litter: how much area does the search pattern sweep?"""
+    return run_mission([], duration=duration, search_only=True, **kwargs)
+
+
 def run_mission(litter, duration=600.0, dt=0.05, width=4.0, height=4.0,
-                params=None, recorder_sink=None):
+                params=None, recorder_sink=None, search_only=False):
     """Simulate one mission; return a dict of results.
 
-    Keys: total, collected, fraction, duration, states (visit counts).
+    Keys: total, collected, fraction, duration, states (visit counts),
+    coverage (fraction of the search area the camera swept).
+    The odometry pose is the world pose relative to the start (centre).
     """
     world = sl.SimWorld(width, height, litter, x=width / 2, y=height / 2)
     machine = bl.BehaviorMachine(params)
     recorder = (tl.TrialRecorder(machine, recorder_sink, "sim")
                 if recorder_sink else None)
     total = len(world.litter)
+    cov_params = dict(sp.DEFAULTS)
+    cov_params.update(params or {})
+    coverage = CoverageGrid(world, cov_params)
     pending = None  # (action, finish_time)
     visits = {}
     last_state = None
     frame = 0
     now = 0.0
-    while now < duration and (world.litter or world.held):
+    while now < duration and (search_only or world.litter or world.held):
         frame += 1
         if pending and now >= pending[1]:
             action = pending[0]
@@ -55,7 +85,8 @@ def run_mission(litter, duration=600.0, dt=0.05, width=4.0, height=4.0,
         cmd = machine.step(
             now, target,
             [r["front_1"], r["front_2"]], [r["rear_1"], r["rear_2"]],
-            [r["left_1"], r["left_2"]], [r["right_1"], r["right_2"]])
+            [r["left_1"], r["left_2"]], [r["right_1"], r["right_2"]],
+            pose=(world.x - width / 2, world.y - height / 2, world.yaw))
         if recorder:
             recorder.update(now, target)
         if cmd.arm_action and pending is None:
@@ -67,8 +98,10 @@ def run_mission(litter, duration=600.0, dt=0.05, width=4.0, height=4.0,
         if machine.state != last_state:
             visits[machine.state] = visits.get(machine.state, 0) + 1
             last_state = machine.state
+        coverage.update(world)
         now += dt
     collected = world.collected
     return {"total": total, "collected": collected,
             "fraction": collected / total if total else 1.0,
-            "duration": now, "states": visits}
+            "duration": now, "states": visits,
+            "coverage": coverage.fraction()}
