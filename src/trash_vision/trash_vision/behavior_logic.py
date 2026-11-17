@@ -110,6 +110,8 @@ class BehaviorMachine:
         self._avoid_dir = 1.0
         self._ignore_until = -math.inf
         self._last_front_min = math.inf
+        # Why the last attempt ended badly (read by trial_log.TrialRecorder).
+        self.reason = None
 
     _ARM_STATE = {"pick": PICK, "deposit": DEPOSIT, "stow": STOW}
 
@@ -133,6 +135,7 @@ class BehaviorMachine:
                 self._enter(DEPOSIT, now)
             else:
                 self._pick_failures += 1
+                self.reason = "pick_failed"
                 if self._pick_failures >= self.p["pick_failures_before_recover"]:
                     self._pick_failures = 0
                     self._enter(RECOVER, now)
@@ -140,6 +143,7 @@ class BehaviorMachine:
                     self._enter(SEARCH, now)
         elif self.state == DEPOSIT:
             self.items_collected += 1 if success else 0
+            self.reason = None if success else "deposit_failed"
             self._enter(STOW, now)
         elif self.state == STOW:
             self._enter(SEARCH, now)
@@ -207,10 +211,12 @@ class BehaviorMachine:
         if self.state == SEARCH and seen:
             self._enter(APPROACH, now)
         if self.state == APPROACH and not seen:
+            self.reason = "target_lost"
             self._enter(SEARCH, now)
         elif (self.state == APPROACH
                 and now - self._state_start > p["approach_timeout"]):
             self._ignore_until = now + p["approach_cooldown"]
+            self.reason = "approach_timeout"
             self._last_seen = -math.inf
             self._enter(SEARCH, now)
 
@@ -243,6 +249,7 @@ class BehaviorMachine:
             return Command(0.0, 0.0, action)
         if now - self._state_start > self.p["arm_timeout"]:
             self.arm_result(False, now)
+            self.reason = "arm_timeout"
         return Command()
 
     def _recover_step(self, now, rear):

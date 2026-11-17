@@ -1,5 +1,7 @@
 # Imports:
 import json
+import os
+import time
 
 # ROS:
 import rclpy
@@ -12,6 +14,7 @@ from std_srvs.srv import Trigger
 # Logic:
 from trash_vision import behavior_logic as bl
 from trash_vision import sonar_scheduler as ss
+from trash_vision import trial_log as tl
 from trash_vision import ultrasonic_logic as ul
 
 FRONT = ul.FRONT_NAMES
@@ -27,11 +30,13 @@ class BehaviorNode(Node):
         super().__init__("behavior")
         self.declare_parameter("rate_hz", 10.0)
         self.declare_parameter("enabled", False)
+        self.declare_parameter("trial_log_dir", "~/curiosity_trials")
         for key, val in bl.DEFAULTS.items():
             self.declare_parameter(key, val)
         params = {k: self.get_parameter(k).value for k in bl.DEFAULTS}
         self._machine = bl.BehaviorMachine(params)
 
+        self._recorder = self._make_recorder()
         self._target = None
         self._target_stamp = None
         self._ranges = {}
@@ -56,6 +61,22 @@ class BehaviorNode(Node):
             self.get_logger().warning(
                 "Behavior disabled (parameter 'enabled' false): robot will "
                 "not move. Set enabled:=true to start searching.")
+
+    # Pickup attempt log (JSON Lines, one file per run); '' disables it:
+    def _make_recorder(self):
+        folder = str(self.get_parameter("trial_log_dir").value).strip()
+        self._log_writer = None
+        if not folder:
+            return None
+        run_id = time.strftime("run_%Y%m%d_%H%M%S")
+        path = os.path.join(os.path.expanduser(folder), run_id + ".jsonl")
+        try:
+            self._log_writer = tl.JsonlWriter(path)
+        except OSError as exc:
+            self.get_logger().error("trial log disabled: %s" % exc)
+            return None
+        self.get_logger().info("logging pickup attempts to %s" % path)
+        return tl.TrialRecorder(self._machine, self._log_writer, run_id)
 
     # Time in seconds:
     def _now(self):
@@ -94,6 +115,8 @@ class BehaviorNode(Node):
         left = sonars(LEFT)
         right = sonars(RIGHT)
         cmd = self._machine.step(now, target, front, rear, left, right)
+        if self._recorder:
+            self._recorder.update(now, target or self._target)
         twist = Twist()
         twist.linear.x = float(cmd.linear)
         twist.angular.z = float(cmd.angular)
@@ -123,6 +146,8 @@ class BehaviorNode(Node):
             self.get_logger().error("arm/%s failed: %s" % (action, exc))
             ok = False
         self._machine.arm_result(ok, self._now(), action)
+        if self._recorder:
+            self._recorder.update(self._now(), self._target)
 
 
 # Main:
@@ -135,5 +160,7 @@ def main(args=None) -> None:
         pass
     finally:
         node._cmd_pub.publish(Twist())
+        if node._log_writer:
+            node._log_writer.close()
         node.destroy_node()
         rclpy.try_shutdown()
