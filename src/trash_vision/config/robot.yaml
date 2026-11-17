@@ -89,6 +89,7 @@ behavior:
   ros__parameters:
     enabled: false            # true lets the robot move; leave false until drive is tested
     rate_hz: 10.0             # state machine rate
+    trial_log_dir: "~/curiosity_trials"  # folder for pickup attempt logs (JSON Lines, one file per run); empty string turns logging off
     search_turn_speed: 0.5    # rad/s spin while searching
     approach_speed: 0.2       # m/s forward speed while approaching
     max_turn_speed: 0.8       # rad/s turn limit

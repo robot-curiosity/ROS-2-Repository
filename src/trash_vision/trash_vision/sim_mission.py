@@ -5,6 +5,7 @@ tracking the 80% pickup target in software (not a real-robot number).
 """
 from trash_vision import behavior_logic as bl
 from trash_vision import sim_logic as sl
+from trash_vision import trial_log as tl
 
 # Seconds the simulated arm takes per action (sim only, not measured).
 ARM_DURATION = {"pick": 2.0, "deposit": 1.5, "stow": 1.0}
@@ -20,13 +21,15 @@ CORNER_LITTER = [(0.15, 0.15), (3.85, 3.85), (0.2, 3.0), (3.8, 0.8)]
 
 
 def run_mission(litter, duration=600.0, dt=0.05, width=4.0, height=4.0,
-                params=None):
+                params=None, recorder_sink=None):
     """Simulate one mission; return a dict of results.
 
     Keys: total, collected, fraction, duration, states (visit counts).
     """
     world = sl.SimWorld(width, height, litter, x=width / 2, y=height / 2)
     machine = bl.BehaviorMachine(params)
+    recorder = (tl.TrialRecorder(machine, recorder_sink, "sim")
+                if recorder_sink else None)
     total = len(world.litter)
     pending = None  # (action, finish_time)
     visits = {}
@@ -45,11 +48,16 @@ def run_mission(litter, duration=600.0, dt=0.05, width=4.0, height=4.0,
             else:
                 ok = True
             machine.arm_result(ok, now, action)
+            if recorder:
+                recorder.update(now)
         r = world.ranges()
+        target = world.target(frame)
         cmd = machine.step(
-            now, world.target(frame),
+            now, target,
             [r["front_1"], r["front_2"]], [r["rear_1"], r["rear_2"]],
             [r["left_1"], r["left_2"]], [r["right_1"], r["right_2"]])
+        if recorder:
+            recorder.update(now, target)
         if cmd.arm_action and pending is None:
             pending = (cmd.arm_action,
                        now + ARM_DURATION[cmd.arm_action])
