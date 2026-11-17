@@ -42,6 +42,9 @@ DEFAULTS = {
     "approach_cooldown": 3.0,
     # Detections older than this are treated as absent (detector died).
     "target_stale_timeout": 1.0,
+    # A sonar that reported before but has been silent this long counts as
+    # blocked (range 0). One full round of 8 sensors takes about 0.7 s.
+    "sonar_stale_timeout": 2.0,
 }
 
 

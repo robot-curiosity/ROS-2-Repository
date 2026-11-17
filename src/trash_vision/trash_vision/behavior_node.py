@@ -11,6 +11,7 @@ from std_srvs.srv import Trigger
 
 # Logic:
 from trash_vision import behavior_logic as bl
+from trash_vision import sonar_scheduler as ss
 from trash_vision import ultrasonic_logic as ul
 
 FRONT = ul.FRONT_NAMES
@@ -34,6 +35,7 @@ class BehaviorNode(Node):
         self._target = None
         self._target_stamp = None
         self._ranges = {}
+        self._range_stamps = {}
         self._stale_after = float(
             self.get_parameter("target_stale_timeout").value)
 
@@ -44,8 +46,7 @@ class BehaviorNode(Node):
         for name in FRONT + REAR + LEFT + RIGHT:
             self.create_subscription(
                 Range, "/ultrasonic/" + name,
-                lambda msg, n=name: self._ranges.__setitem__(n, msg.range),
-                10)
+                lambda msg, n=name: self._on_range(n, msg.range), 10)
         self._clients = {
             a: self.create_client(Trigger, "arm/" + a)
             for a in ("pick", "deposit", "stow")}
@@ -60,6 +61,11 @@ class BehaviorNode(Node):
     def _now(self):
         return self.get_clock().now().nanoseconds / 1e9
 
+    # Sonar callback (local receive time, so clock skew cannot hide a stall):
+    def _on_range(self, name, value) -> None:
+        self._ranges[name] = value
+        self._range_stamps[name] = self._now()
+
     # Target callback:
     def _on_target(self, msg) -> None:
         try:
@@ -73,13 +79,20 @@ class BehaviorNode(Node):
         if not self.get_parameter("enabled").value:
             return
         now = self._now()
-        # Missing sensors read as 'inf' (nothing seen); see HARDWARE_TESTS.
-        front = [self._ranges.get(n, float("inf")) for n in FRONT]
-        rear = [self._ranges.get(n, float("inf")) for n in REAR]
+        # Never-heard sensors read 'inf' (not installed); sensors that went
+        # silent read 0 (blocked). See sonar_scheduler.apply_staleness.
+        stale = float(self.get_parameter("sonar_stale_timeout").value)
+
+        def sonars(names):
+            return ss.apply_staleness(
+                names, self._ranges, self._range_stamps, now, stale)
+
+        front = sonars(FRONT)
+        rear = sonars(REAR)
         target = bl.fresh_target(
             self._target, self._target_stamp, now, self._stale_after)
-        left = [self._ranges.get(n, float("inf")) for n in LEFT]
-        right = [self._ranges.get(n, float("inf")) for n in RIGHT]
+        left = sonars(LEFT)
+        right = sonars(RIGHT)
         cmd = self._machine.step(now, target, front, rear, left, right)
         twist = Twist()
         twist.linear.x = float(cmd.linear)

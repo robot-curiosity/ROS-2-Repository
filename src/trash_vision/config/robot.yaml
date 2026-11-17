@@ -31,7 +31,8 @@ ultrasonic:
     # Order: front_1, front_2, rear_1, rear_2, left_1, left_2, right_1, right_2
     trig_pins: [-1, -1, -1, -1, -1, -1, -1, -1]   # BCM pins, one per sensor in the order above
     echo_pins: [-1, -1, -1, -1, -1, -1, -1, -1]   # BCM pins (5 V echo needs a divider first)
-    publish_rate_hz: 10.0     # Hz full-array publish rate
+    settle_gap_s: 0.06        # s between pings; sensors fire one at a time, round-robin (HC-SR04s hear each other)
+    echo_timeout_s: 0.025     # s max wait for an echo per sensor (4 m round trip is ~0.023 s)
     median_window: 3          # readings in the median filter
     frame_prefix: "ultrasonic_"
 arm:
@@ -108,3 +109,4 @@ behavior:
     approach_timeout: 30.0    # seconds before APPROACH gives up
     approach_cooldown: 3.0    # seconds detections are ignored after an approach timeout
     target_stale_timeout: 1.0 # seconds before a /vision/target message counts as stale
+    sonar_stale_timeout: 2.0  # seconds before a sonar that reported earlier counts as blocked (full 8-sensor round takes ~0.7 s)
