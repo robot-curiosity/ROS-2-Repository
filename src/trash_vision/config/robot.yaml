@@ -68,6 +68,7 @@ detector:
     model_path: "/home/christopherg/best_ncnn_model"  # YOLOv8 NCNN model folder on the Pi
     camera_source: "tcp://127.0.0.1:8888"             # camera stream URL or device
     confidence: 0.40          # minimum YOLO confidence 0..1
+    process_rate_hz: 10.0     # max detector cycles per second (Hz); frames are always the newest, measured rate is on /vision/fps
     deadband: 0.12            # normalized horizontal error treated as centred
     mapping_upload_url: "http://192.168.0.102:5000/frame"  # map server upload URL
     mapping_enabled: true     # upload frames to the map server
