@@ -7,6 +7,7 @@ from trash_vision import arm_logic as al
 from trash_vision import behavior_logic as bl
 from trash_vision import config_logic as cl
 from trash_vision import gps_imu_logic as gl
+from trash_vision import safety_logic as sfl
 
 PKG = os.path.join(os.path.dirname(__file__), "..")
 NODE_FILES = {
@@ -59,6 +60,7 @@ def expected(node):
     names = declared(node)
     if node == "behavior":
         names.update(bl.DEFAULTS)
+        names.update(sfl.DEFAULTS)
     if node == "arm":
         for pose, value in al.DEFAULT_POSES.items():
             names["pose_" + pose] = list(value)

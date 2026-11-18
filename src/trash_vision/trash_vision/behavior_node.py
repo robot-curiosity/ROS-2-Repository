@@ -15,6 +15,7 @@ from std_srvs.srv import Trigger
 
 # Logic:
 from trash_vision import behavior_logic as bl
+from trash_vision import safety_logic as sfl
 from trash_vision import sonar_scheduler as ss
 from trash_vision import trial_log as tl
 from trash_vision import ultrasonic_logic as ul
@@ -37,6 +38,11 @@ class BehaviorNode(Node):
             self.declare_parameter(key, val)
         params = {k: self.get_parameter(k).value for k in bl.DEFAULTS}
         self._machine = bl.BehaviorMachine(params)
+        for key, val in sfl.DEFAULTS.items():
+            self.declare_parameter(key, val)
+        self._safety = sfl.SafetyStage(
+            {k: self.get_parameter(k).value for k in sfl.DEFAULTS})
+        self._last_safety_reason = ""
 
         self._recorder = self._make_recorder()
         self._target = None
@@ -62,6 +68,8 @@ class BehaviorNode(Node):
             for a in ("pick", "deposit", "stow")}
         rate = float(self.get_parameter("rate_hz").value)
         self.create_timer(1.0 / max(rate, 0.1), self._tick)
+        # Watchdog runs faster than the tick so a stalled tick is caught:
+        self.create_timer(0.1, self._watchdog)
         if not self.get_parameter("enabled").value:
             self.get_logger().warning(
                 "Behavior disabled (parameter 'enabled' false): robot will "
@@ -136,13 +144,39 @@ class BehaviorNode(Node):
             now, target, front, rear, left, right, pose=pose)
         if self._recorder:
             self._recorder.update(now, target or self._target)
+        # Safety output stage is the last filter before cmd_vel:
+        self._safety.note_update(now)
+        sonars_ok = sfl.sonars_healthy(
+            FRONT + REAR + LEFT + RIGHT, self._range_stamps, now, stale,
+            bool(self.get_parameter("safety_require_sonars").value))
+        lin, ang = self._safety.apply(
+            now, float(cmd.linear), float(cmd.angular), min(front),
+            sonars_ok)
+        self._log_safety()
         twist = Twist()
-        twist.linear.x = float(cmd.linear)
-        twist.angular.z = float(cmd.angular)
+        twist.linear.x = float(lin)
+        twist.angular.z = float(ang)
         self._cmd_pub.publish(twist)
         if cmd.arm_action:
             self._call_arm(cmd.arm_action)
         self._state_pub.publish(String(data=self._machine.state))
+
+    # Publish zero if the main tick stopped running (enabled only):
+    def _watchdog(self) -> None:
+        if not self.get_parameter("enabled").value:
+            return
+        if self._safety.timed_out(self._now()):
+            self._cmd_pub.publish(Twist())
+            self._safety.apply(self._now(), 0.0, 0.0, 0.0, False)
+            self._log_safety()
+
+    # Log a safety intervention once per change of reason:
+    def _log_safety(self) -> None:
+        reason = self._safety.reason
+        if reason != self._last_safety_reason:
+            if reason and reason not in ("clamped", "accel_limited"):
+                self.get_logger().warning("safety stop: %s" % reason)
+            self._last_safety_reason = reason
 
     # Call arm service:
     def _call_arm(self, action) -> None:
