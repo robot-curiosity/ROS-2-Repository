@@ -1,4 +1,8 @@
 """Pure-Python helpers for the SO101 arm node (no ROS or LeRobot needed)."""
+import math
+from dataclasses import dataclass
+
+from trash_vision import arm_kinematics as ak
 
 JOINT_NAMES = [
     "shoulder_pan", "shoulder_lift", "elbow_flex",
@@ -96,3 +100,74 @@ def plan_sequence(name, poses, gripper_open, gripper_closed):
 def grasp_held(gripper_pos, gripper_closed, min_gap):
     """True if the gripper stopped open by at least min_gap (holding item)."""
     return gripper_pos - gripper_closed >= min_gap
+
+
+@dataclass(frozen=True)
+class PickConfig:
+    """Geometry and joint mapping for IK pick waypoints.
+
+    Defaults are placeholders: TODO: Bryan to fill in / measure. The mount
+    height is the arm shelf top per STATE.md (215.5 mm, from CAD, not
+    measured). The mount x/y default is the experimental branch's drivebase
+    value, NOT this robot's CAD. Zone limits are the pick zone from STATE.md.
+    """
+
+    mount_x: float = 0.115     # arm base ahead of base_link (m) TODO: Bryan
+    mount_y: float = 0.0       # arm base left of base_link (m) TODO: Bryan
+    mount_height: float = 0.2155   # arm base above ground (m), CAD
+    grasp_height: float = 0.03     # gripper tip height at grasp (m) TODO
+    clearance: float = 0.06    # lift above the grasp point for pre-grasp (m)
+    zone_min_x: float = 0.35   # pick zone ahead of base_link (m), STATE.md
+    zone_max_x: float = 0.56
+    zone_max_abs_y: float = 0.30   # sideways limit (m) TODO: Bryan
+    approach_deg: tuple = (-90.0, -75.0, -60.0)  # steepest first
+    use_degrees: bool = True
+    # Model radians -> backend units: value = sign * model + offset.
+    # TODO: Bryan to calibrate against the real arm (LeRobot calibration).
+    joint_sign: tuple = (1.0, 1.0, 1.0, 1.0)
+    joint_offset: tuple = (0.0, 0.0, 0.0, 0.0)
+    gripper_open: float = 50.0
+
+
+def _to_backend(rad, sign, offset, use_degrees):
+    value = math.degrees(rad) if use_degrees else rad
+    return sign * value + offset
+
+
+def _pose(sol, cfg, gripper):
+    joints = (sol.shoulder_pan, sol.shoulder_lift, sol.elbow_flex,
+              sol.wrist_flex)
+    out = [_to_backend(j, cfg.joint_sign[i], cfg.joint_offset[i],
+                       cfg.use_degrees) for i, j in enumerate(joints)]
+    return out + [0.0, gripper]
+
+
+def plan_pick_poses(base_x, base_y, cfg=None):
+    """IK pick waypoints for a floor target at (base_x, base_y) in base_link.
+
+    Returns (poses, reason). poses is {"pre_grasp", "grasp", "lift"} (6-value
+    poses in backend units) or None, with reason saying why (outside the
+    pick zone, or unreachable by the arm). Never clamps or guesses.
+    """
+    cfg = PickConfig() if cfg is None else cfg
+    if not (cfg.zone_min_x <= base_x <= cfg.zone_max_x):
+        return None, "outside pick zone (x %.2f m)" % base_x
+    if abs(base_y) > cfg.zone_max_abs_y:
+        return None, "outside pick zone (y %.2f m)" % base_y
+    dx = base_x - cfg.mount_x
+    dy = base_y - cfg.mount_y
+    z_grasp = cfg.grasp_height - cfg.mount_height
+    grasp = (dx, dy, z_grasp)
+    above = (dx, dy, z_grasp + cfg.clearance)
+    for deg in cfg.approach_deg:
+        angle = math.radians(deg)
+        s_grasp = ak.solve(ak.SO101, grasp, angle)
+        s_above = ak.solve(ak.SO101, above, angle)
+        if s_grasp is None or s_above is None:
+            continue
+        return {
+            "pre_grasp": _pose(s_above, cfg, cfg.gripper_open),
+            "grasp": _pose(s_grasp, cfg, cfg.gripper_open),
+            "lift": _pose(s_above, cfg, 0.0),
+        }, "ok"
+    return None, "target not reachable by the arm"

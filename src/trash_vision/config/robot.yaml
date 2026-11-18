@@ -48,6 +48,19 @@ arm:
     max_step: 3.0             # max joint change per step (degrees)
     step_period_s: 0.05       # seconds per interpolation step
     state_rate_hz: 10.0       # joint state publish rate
+    ik_enabled: false         # true = compute pick waypoints from /vision/target base_x/base_y with arm_kinematics (enable only after the ik_* values below are calibrated)
+    ik_mount_x: 0.115         # m, arm base ahead of base_link. TODO: Bryan to measure (0.115 is the experimental branch's drivebase, not this CAD)
+    ik_mount_y: 0.0           # m, arm base left of base_link. TODO: Bryan to measure
+    ik_mount_height: 0.2155   # m, arm base above ground (arm shelf top 215.5 mm from CAD per STATE.md, not measured)
+    ik_grasp_height: 0.03     # m, gripper tip height above ground when grasping a can. TODO: Bryan to tune
+    ik_clearance: 0.06        # m, pre-grasp/lift height above the grasp point
+    ik_zone_min_x: 0.35       # m, nearest accepted target ahead of base_link (pick zone from STATE.md)
+    ik_zone_max_x: 0.56       # m, farthest accepted target ahead of base_link (pick zone from STATE.md)
+    ik_zone_max_abs_y: 0.30   # m, max sideways offset accepted. TODO: Bryan to confirm
+    ik_approach_deg: [-90.0, -75.0, -60.0]  # last-link angles to try, steepest first (-90 = straight down)
+    ik_joint_sign: [1.0, 1.0, 1.0, 1.0]     # +1/-1 per pan, lift, elbow, wrist_flex: model direction vs LeRobot direction. TODO: Bryan to calibrate
+    ik_joint_offset: [0.0, 0.0, 0.0, 0.0]   # backend units added per pan, lift, elbow, wrist_flex. TODO: Bryan to calibrate
+    target_max_age_s: 1.5     # s, a target older than this is not used for a pick
     pose_stow: [0.0, -90.0, 90.0, 60.0, 0.0, 0.0]        # placeholder pose, calibrate
     pose_pre_grasp: [0.0, -30.0, 60.0, 30.0, 0.0, 50.0]  # placeholder pose, calibrate
     pose_grasp: [0.0, 0.0, 45.0, 20.0, 0.0, 50.0]        # placeholder pose, calibrate
