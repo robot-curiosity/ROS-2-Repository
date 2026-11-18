@@ -141,3 +141,11 @@ behavior:
     search_speed: 0.2         # m/s along a row
     search_waypoint_tolerance: 0.15  # metres; waypoint counts as reached
     search_stuck_timeout: 10.0  # seconds without progress before a waypoint is skipped
+    # Safety output stage (last filter before cmd_vel); working values, tune on the robot:
+    safety_max_linear: 0.4    # m/s hard speed clamp
+    safety_max_angular: 1.0   # rad/s hard turn clamp
+    safety_max_linear_accel: 0.5   # m/s^2 acceleration limit
+    safety_max_angular_accel: 2.0  # rad/s^2 angular acceleration limit
+    safety_hard_stop_distance: 0.12  # metres; front sonar below this forces zero velocity (keep below stop_distance)
+    safety_behavior_timeout: 0.5  # seconds without a behavior update before zero velocity
+    safety_require_sonars: true   # true: stop if no sonar ever reported; false only for bring-up without sonars
