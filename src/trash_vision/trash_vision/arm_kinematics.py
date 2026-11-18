@@ -1,4 +1,5 @@
-"""Planar kinematics and closed-form inverse kinematics for the SO-101.
+"""
+Planar kinematics and closed-form inverse kinematics for the SO-101.
 
 Pure Python (math only, no numpy, no URDF parser, no ROS). Ported from
 ``drivebase_behaviour/kinematics.py`` and ``ik.py`` on branch
@@ -13,17 +14,17 @@ joint commands are ``q = sense * t`` and ``sense`` is -1 on this arm.
 ``r`` is the signed projection onto the radial direction measured from the
 pan axis (not hypot from the base origin), see ``PlanarArm``.
 """
-import math
 from dataclasses import dataclass
+import math
 
 # From so101_macro.xacro on the experimental branch (radians).
 JOINT_LIMITS = {
-    "shoulder_pan": (-1.91986, 1.91986),
-    "shoulder_lift": (-1.74533, 1.74533),
-    "elbow_flex": (-1.69, 1.69),
-    "wrist_flex": (-1.65806, 1.65806),
-    "wrist_roll": (-2.74385, 2.84121),
-    "gripper": (-0.174533, 1.74533),
+    'shoulder_pan': (-1.91986, 1.91986),
+    'shoulder_lift': (-1.74533, 1.74533),
+    'elbow_flex': (-1.69, 1.69),
+    'wrist_flex': (-1.65806, 1.65806),
+    'wrist_roll': (-2.74385, 2.84121),
+    'gripper': (-0.174533, 1.74533),
 }
 
 
@@ -77,14 +78,16 @@ class PlanarArm:
     def tip(self, t1, t2, t3):
         """Planar (r, z) of the tip for the three pitch joint values."""
         q1, q2, q3 = self.sense * t1, self.sense * t2, self.sense * t3
-        r = self.origin_r + (
-            self.l1 * math.cos(self.a1 + q1)
-            + self.l2 * math.cos(self.a2 + q1 + q2)
-            + self.l3 * math.cos(self.a3 + q1 + q2 + q3))
-        z = self.origin_z + (
-            self.l1 * math.sin(self.a1 + q1)
-            + self.l2 * math.sin(self.a2 + q1 + q2)
-            + self.l3 * math.sin(self.a3 + q1 + q2 + q3))
+        r_terms = [
+            self.l1 * math.cos(self.a1 + q1),
+            self.l2 * math.cos(self.a2 + q1 + q2),
+            self.l3 * math.cos(self.a3 + q1 + q2 + q3)]
+        r = self.origin_r + sum(r_terms)
+        z_terms = [
+            self.l1 * math.sin(self.a1 + q1),
+            self.l2 * math.sin(self.a2 + q1 + q2),
+            self.l3 * math.sin(self.a3 + q1 + q2 + q3)]
+        z = self.origin_z + sum(z_terms)
         return (r, z)
 
 
@@ -116,14 +119,15 @@ def _within(name, value, limits):
 
 
 def solve(arm, target_xyz, approach_angle, limits=None):
-    """Closed-form IK. Returns an IkSolution or None if out of reach/limits.
+    """
+    Closed-form IK. Returns an IkSolution or None if out of reach/limits.
 
     approach_angle is the planar direction of the last link (straight down is
     -pi/2). Never clamps: an unreachable target returns None.
     """
     limits = JOINT_LIMITS if limits is None else limits
     pan = arm.bearing(target_xyz)
-    if not _within("shoulder_pan", pan, limits):
+    if not _within('shoulder_pan', pan, limits):
         return None
     r, z = arm.to_planar(target_xyz, pan)
     wrist_r = r - arm.origin_r - arm.l3 * math.cos(approach_angle)
@@ -151,15 +155,15 @@ def _finish(arm, wrist_r, wrist_z, interior, approach_angle, pan, limits):
     q2 = (link1 + interior) - arm.a2 - q1
     q3 = approach_angle - arm.a3 - q1 - q2
     lift, elbow, flex = arm.sense * q1, arm.sense * q2, arm.sense * q3
-    for name, value in (("shoulder_lift", lift), ("elbow_flex", elbow),
-                        ("wrist_flex", flex)):
+    for name, value in (('shoulder_lift', lift), ('elbow_flex', elbow),
+                        ('wrist_flex', flex)):
         if not _within(name, value, limits):
             return None
     return IkSolution(pan, lift, elbow, flex)
 
 
 def graspable(arm, r, z, approach_angle, clearance_height=0.0, limits=None):
-    """True if both the grasp point and the point above it solve."""
+    """Return True if both the grasp point and the point above it solve."""
     grasp = arm.from_planar(r, z)
     if solve(arm, grasp, approach_angle, limits) is None:
         return False
@@ -169,7 +173,8 @@ def graspable(arm, r, z, approach_angle, clearance_height=0.0, limits=None):
 
 def reachable_radius_band(arm, z, approach_angle, clearance_height=0.0,
                           r_min=0.0, r_max=0.6, step=0.002, limits=None):
-    """Widest contiguous (low, high) span of planar r graspable at height z.
+    """
+    Widest contiguous (low, high) span of planar r graspable at height z.
 
     Returns None if nothing in [r_min, r_max] solves. Scanned, not solved.
     """

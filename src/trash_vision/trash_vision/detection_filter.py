@@ -1,13 +1,14 @@
-"""Pure-Python detection filtering (no ROS, camera or model needed).
+"""
+Pure-Python detection filtering (no ROS, camera or model needed).
 
 Keeps a target from being reported until it has been seen in N of the last M
 frames, drops detections inside ignore regions (where the robot's own bag
 hoop or arm can appear), and picks the best remaining target by distance,
 then confidence.
 """
-import math
 from collections import deque
 from dataclasses import dataclass
+import math
 from typing import Any, List, Optional, Sequence
 
 
@@ -30,7 +31,8 @@ class Candidate:
 
 
 def parse_regions(flat: Sequence[float]) -> List[tuple]:
-    """Turn a flat [x1, y1, x2, y2, ...] list into rectangles.
+    """
+    Turn a flat [x1, y1, x2, y2, ...] list into rectangles.
 
     A trailing incomplete group is ignored (ROS parameters cannot nest).
     """
@@ -45,7 +47,7 @@ def parse_regions(flat: Sequence[float]) -> List[tuple]:
 
 
 def in_region(candidate: Candidate, regions: Sequence[tuple]) -> bool:
-    """True if the candidate's centre lies inside any ignore region."""
+    """Return True if the candidate's centre lies inside any ignore region."""
     cx, cy = candidate.center
     return any(x1 <= cx <= x2 and y1 <= cy <= y2
                for x1, y1, x2, y2 in regions)
@@ -79,11 +81,22 @@ class DetectionFilter:
         """Forget all tracks."""
         self._tracks = []
 
+    def _is_usable(self, c):
+        """Return True if c is confident enough and outside the ignore regions."""
+        if c.confidence < self.min_confidence:
+            return False
+        return not in_region(c, self.ignore_regions)
+
+    def _is_confirmed(self, track):
+        """Return True if the track matched this frame and was seen often enough."""
+        if not track.matched_now:
+            return False
+        return track.seen_count() >= self.confirm_frames
+
     def update(self, candidates: Sequence[Candidate]) -> Optional[Candidate]:
         """Feed one frame (possibly empty); return the best confirmed one."""
         usable = [c for c in candidates
-                  if c.confidence >= self.min_confidence
-                  and not in_region(c, self.ignore_regions)]
+                  if self._is_usable(c)]
         for track in self._tracks:
             track.matched_now = False
             track.candidate = None
@@ -116,8 +129,7 @@ class DetectionFilter:
         self._tracks = [t for t in self._tracks if t.seen_count() > 0]
 
         confirmed = [t.candidate for t in self._tracks
-                     if t.matched_now
-                     and t.seen_count() >= self.confirm_frames]
+                     if self._is_confirmed(t)]
         if not confirmed:
             return None
         return min(confirmed, key=_rank)
