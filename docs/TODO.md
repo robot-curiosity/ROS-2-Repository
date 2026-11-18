@@ -51,7 +51,6 @@ Order matters; later items assume earlier ones. One item per run, one PR each.
 
 The end goal Bryan set: as each part of the robot is assembled he only puts values into `config/robot.yaml`, runs one command and tests it. Items 10-14 build that path first; everything after improves behavior and software quality.
 
-- [ ] 23. Pin budget document. Write `docs/PIN_BUDGET.md`: list every signal the Pi needs (8 sonar trig, 8 echo, 2 PWM, 2 dir, 4 encoder channels per the config, plus I2C/UART for IMU, GPS and the arm), count the GPIO available on a Pi 5 header, and show the shortfall (RISKS.md says about 32 needed vs 26). List the options (shared trigger line, I2C GPIO expander, moving wheel control to a Pico) with pin counts for each. Present options only. The choice is Bryan's. Do not edit `robot.yaml` pins.
 - [ ] 25. Style cleanup (one or two modules per run). The ament flake8 and pep257 tests are skipped in CI because of 247 legacy complaints. Fix them module by module and, once a module is clean, say so in the PR. When every module is clean, remove the skip from `.github/workflows/ci.yml`.
 - [ ] 26. Package hygiene. Declare the missing dependencies in `package.xml` (OpenCV, requests, ultralytics where a rosdep key exists, otherwise note it), set a real package description, and leave the license as "TODO: Bryan to choose".
 
@@ -67,6 +66,8 @@ If every item is done or blocked, stop and say so in the run summary. Do not inv
 - Anything that needs the real robot or purchasing: counts per revolution, fuse sizing, IMU/GPS wiring, field trials.
 
 ## Done
+
+- [x] 23. Pin budget document. `docs/PIN_BUDGET.md` lists every signal, the 28 needed vs 26 usable count, and options A-E with pin counts. Options only; the choice is Bryan's.
 
 - [x] 22. Safety output stage. A pure-Python last stage in the behavior node: clamp speed and acceleration (parameters), force zero velocity if sonars are stale, if the front minimum is below a hard stop distance, or if no behavior update has arrived within a timeout. Tests for every case. Do not change the drive node. (Done: `safety_logic.py` (`SafetyStage`, `sonars_healthy`), applied in `behavior_node` just before `cmd_vel` plus a 10 Hz watchdog; params `safety_*` in `robot.yaml`; 14 tests in `test_safety_logic.py`. Drive node untouched. Real-robot check in HARDWARE_TESTS.)
 - [x] 21. Arm kinematics. Port the pure-Python SO-101 forward/inverse kinematics from `drivebase_behaviour` ... (Done: `arm_kinematics.py` ported from `kinematics.py`/`ik.py` on `experimental/behaviour-coordinator` with the URDF-derived planar constants baked in (no numpy/URDF parser), `arm_logic.plan_pick_poses` builds pre_grasp/grasp/lift from `/vision/target` `base_x/base_y` (tries -90/-75/-60 deg approach, rejects outside the pick zone or unreachable), arm node uses it when `ik_enabled` (default false until Bryan calibrates mount and joint sign/offset); 14 new tests. Real-arm mapping needs the robot, see HARDWARE_TESTS.)
