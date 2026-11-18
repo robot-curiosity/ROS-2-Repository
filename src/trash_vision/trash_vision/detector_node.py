@@ -30,7 +30,8 @@ from std_msgs.msg import Float32, String
 from ultralytics import YOLO
 
 # Logic:
-from trash_vision import detection_logic, frame_grabber, ground_projection
+from trash_vision import (
+    detection_filter, detection_logic, frame_grabber, ground_projection)
 
 # OS:
 import os
@@ -100,6 +101,14 @@ class TrashDetector(Node):
                 ("camera_pitch_deg", 35.0),
                 ("camera_hfov_deg", 66.0),
                 ("camera_vfov_deg", 41.0),
+
+                # Detection filtering (item 20):
+                ("confirm_frames", 3),
+                ("confirm_window", 5),
+                ("track_match_radius", 0.10),
+                # Flat x1,y1,x2,y2 groups, normalized 0..1; a zero-area
+                # group means none. TODO: Bryan to measure the bag hoop/arm.
+                ("ignore_regions", [0.0, 0.0, 0.0, 0.0]),
             ],
         )
 
@@ -117,6 +126,19 @@ class TrashDetector(Node):
         # Confidence:
         self.confidence: float = float(
             self.get_parameter("confidence").value
+        )
+
+        # Detection filter:
+        self.detection_filter = detection_filter.DetectionFilter(
+            min_confidence=self.confidence,
+            confirm_frames=int(
+                self.get_parameter("confirm_frames").value),
+            window_frames=int(
+                self.get_parameter("confirm_window").value),
+            match_radius=float(
+                self.get_parameter("track_match_radius").value),
+            ignore_regions=detection_filter.parse_regions(
+                self.get_parameter("ignore_regions").value),
         )
 
         # Processing rate:
@@ -381,25 +403,34 @@ class TrashDetector(Node):
             # Logic:
             return
 
-        # Variables (Assignment):
-        # Confidences:
-        confidences = boxes.conf.cpu().numpy()
-
-        # Index:
-        best_index = int(confidences.argmax())
+        # Candidates (all boxes, normalized), filtered over frames:
+        candidates = []
+        all_xyxy = boxes.xyxy.cpu().numpy().tolist()
+        all_conf = boxes.conf.cpu().numpy().tolist()
+        for bx1, by1, bx2, by2, bconf in (
+            (*xyxy, conf) for xyxy, conf in zip(all_xyxy, all_conf)
+        ):
+            floor_pt = ground_projection.floor_point_to_base(
+                (bx1 + bx2) / 2.0 / width, by2 / height, self.camera)
+            distance = (
+                None if floor_pt is None
+                else (floor_pt[0] ** 2 + floor_pt[1] ** 2) ** 0.5
+            )
+            candidates.append(detection_filter.Candidate(
+                bx1 / width, by1 / height, bx2 / width, by2 / height,
+                float(bconf), distance, (bx1, by1, bx2, by2, bconf),
+            ))
+        chosen = self.detection_filter.update(candidates)
+        if chosen is None:
+            self.publish_no_target()
+            self.report_processing_rate()
+            return
 
         # Coordinates:
-        x1, y1, x2, y2 = (
-            boxes.xyxy[best_index]
-            .cpu()
-            .numpy()
-            .tolist()
-        )
+        x1, y1, x2, y2, _ = chosen.payload
 
         # Confidence:
-        confidence: float = float(
-            confidences[best_index]
-        )
+        confidence: float = float(chosen.confidence)
 
         # Calculations:
         center_x_pixels = (x1 + x2) / 2.0
