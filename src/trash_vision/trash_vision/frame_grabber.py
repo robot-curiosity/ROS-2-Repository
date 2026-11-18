@@ -16,6 +16,7 @@ class LatestFrame:
     """Thread-safe single-slot holder: a new frame replaces the old one."""
 
     def __init__(self, clock=time.monotonic):
+        """Create an empty holder; ``clock`` returns seconds."""
         self._clock = clock
         self._lock = threading.Lock()
         self._frame = None
@@ -25,6 +26,7 @@ class LatestFrame:
         self.dropped = 0
 
     def put(self, frame):
+        """Store a frame, replacing (and counting as dropped) an unread one."""
         with self._lock:
             if self._seq > self._taken_seq:
                 # The previous frame was never processed: it is dropped.
@@ -46,6 +48,7 @@ class FrameGrabber:
     """Reads ``read_fn() -> (ok, frame)`` in a thread into a LatestFrame."""
 
     def __init__(self, read_fn, latest=None, retry_delay_s=0.05):
+        """Set up the reader thread (not started until ``start``)."""
         self.read_fn = read_fn
         self.latest = latest if latest is not None else LatestFrame()
         self.retry_delay_s = retry_delay_s
@@ -71,12 +74,14 @@ class FrameGrabber:
                 self._stop.wait(self.retry_delay_s)
 
     def start(self):
+        """Start the reader thread if it is not running."""
         if self._thread is None:
             self._thread = threading.Thread(
-                target=self._loop, name="frame-grabber", daemon=True)
+                target=self._loop, name='frame-grabber', daemon=True)
             self._thread.start()
 
     def stop(self, timeout=2.0):
+        """Stop the reader thread and wait up to ``timeout`` seconds."""
         self._stop.set()
         if self._thread is not None:
             self._thread.join(timeout=timeout)
@@ -87,10 +92,12 @@ class RateMeter:
     """Events per second over the last ``window_s`` seconds."""
 
     def __init__(self, window_s=2.0):
+        """Create a meter averaging over ``window_s`` seconds."""
         self.window_s = float(window_s)
         self._times = collections.deque()
 
     def tick(self, now):
+        """Record one event at time ``now`` (seconds)."""
         self._times.append(now)
         self._trim(now)
 
