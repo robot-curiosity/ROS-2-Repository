@@ -11,14 +11,16 @@ def _reachable():
     out = []
     for q1, q2, q3 in [(0.2, -0.3, 0.1), (-0.3, 0.5, -0.2),
                        (0.6, -0.8, 0.4)]:
-        r = ARM.origin_r + (
-            ARM.l1 * math.cos(ARM.a1 + q1)
-            + ARM.l2 * math.cos(ARM.a2 + q1 + q2)
-            + ARM.l3 * math.cos(ARM.a3 + q1 + q2 + q3))
-        z = ARM.origin_z + (
-            ARM.l1 * math.sin(ARM.a1 + q1)
-            + ARM.l2 * math.sin(ARM.a2 + q1 + q2)
-            + ARM.l3 * math.sin(ARM.a3 + q1 + q2 + q3))
+        r_terms = [
+            ARM.l1 * math.cos(ARM.a1 + q1),
+            ARM.l2 * math.cos(ARM.a2 + q1 + q2),
+            ARM.l3 * math.cos(ARM.a3 + q1 + q2 + q3)]
+        r = ARM.origin_r + sum(r_terms)
+        z_terms = [
+            ARM.l1 * math.sin(ARM.a1 + q1),
+            ARM.l2 * math.sin(ARM.a2 + q1 + q2),
+            ARM.l3 * math.sin(ARM.a3 + q1 + q2 + q3)]
+        z = ARM.origin_z + sum(z_terms)
         out.append((r, z, ARM.a3 + q1 + q2 + q3))
     return out
 
@@ -54,7 +56,7 @@ def test_solution_round_trips_through_forward_kinematics():
 def test_solution_respects_limits():
     for r, z, approach in _reachable():
         s = ak.solve(ARM, ARM.from_planar(r, z), approach)
-        for name in ("shoulder_lift", "elbow_flex", "wrist_flex"):
+        for name in ('shoulder_lift', 'elbow_flex', 'wrist_flex'):
             low, high = ak.JOINT_LIMITS[name]
             assert low <= getattr(s, name) <= high
 
@@ -70,7 +72,7 @@ def test_pan_limit_rejects_behind_the_arm():
 
 def test_limit_violation_returns_none():
     tight = dict(ak.JOINT_LIMITS)
-    tight["elbow_flex"] = (-0.01, 0.01)
+    tight['elbow_flex'] = (-0.01, 0.01)
     r, z, approach = _reachable()[0]
     assert ak.solve(ARM, ARM.from_planar(r, z), approach, tight) is None
 
