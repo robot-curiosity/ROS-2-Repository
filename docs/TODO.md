@@ -51,7 +51,7 @@ Order matters; later items assume earlier ones. One item per run, one PR each.
 
 The end goal Bryan set: as each part of the robot is assembled he only puts values into `config/robot.yaml`, runs one command and tests it. Items 10-14 build that path first; everything after improves behavior and software quality.
 
-- [ ] 25. Style cleanup (one or two modules per run). The ament flake8 and pep257 tests are skipped in CI because of 247 legacy complaints. Fix them module by module and, once a module is clean, say so in the PR. When every module is clean, remove the skip from `.github/workflows/ci.yml`.
+- [ ] 25. Style cleanup (one or two modules per run). The ament flake8 and pep257 tests are skipped in CI because of 247 legacy complaints. Fix them module by module and, once a module is clean, say so in the PR. (Progress, run 1: `frame_grabber`, `sonar_scheduler`, `trial_summary`, `bringup_util` are clean.) When every module is clean, remove the skip from `.github/workflows/ci.yml`.
 - [ ] 26. Package hygiene. Declare the missing dependencies in `package.xml` (OpenCV, requests, ultralytics where a rosdep key exists, otherwise note it), set a real package description, and leave the license as "TODO: Bryan to choose".
 
 If every item is done or blocked, stop and say so in the run summary. Do not invent new work.

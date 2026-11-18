@@ -11,16 +11,17 @@ import math
 
 from trash_vision import ultrasonic_logic as ul
 
-OK = "ok"
-NO_ECHO = "no_echo"        # nothing heard: no obstacle within range
-TOO_CLOSE = "too_close"    # inside the blind zone: obstacle, report min range
-OUT_OF_RANGE = "out_of_range"  # echo from beyond max range: no obstacle
+OK = 'ok'
+NO_ECHO = 'no_echo'        # nothing heard: no obstacle within range
+TOO_CLOSE = 'too_close'    # inside the blind zone: obstacle, report min range
+OUT_OF_RANGE = 'out_of_range'  # echo from beyond max range: no obstacle
 
 
 class SonarScheduler:
     """Round-robin firing order with a minimum gap between pings."""
 
     def __init__(self, names, settle_gap_s=0.06):
+        """Fire ``names`` in order, at least ``settle_gap_s`` apart."""
         self.names = list(names)
         self.settle_gap_s = max(0.0, float(settle_gap_s))
         self._index = 0
