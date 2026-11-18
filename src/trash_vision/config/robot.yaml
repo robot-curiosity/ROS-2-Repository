@@ -86,6 +86,10 @@ detector:
     camera_pitch_deg: 35.0    # degrees the camera looks down
     camera_hfov_deg: 66.0     # horizontal field of view in degrees
     camera_vfov_deg: 41.0     # vertical FOV, Camera Module 3 guess, check stream crop
+    confirm_frames: 3         # a target must be seen in this many of the last confirm_window frames before it is reported
+    confirm_window: 5         # frames in the confirmation window
+    track_match_radius: 0.10  # normalized image distance within which a box counts as the same target between frames
+    ignore_regions: [0.0, 0.0, 0.0, 0.0]  # normalized x1,y1,x2,y2 groups (repeat for more) where own bag hoop/arm appears; zero-area = none. TODO: Bryan to measure from a camera frame
 behavior:
   ros__parameters:
     enabled: false            # true lets the robot move; leave false until drive is tested
