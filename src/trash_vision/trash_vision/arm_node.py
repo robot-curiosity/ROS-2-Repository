@@ -1,4 +1,5 @@
 # Imports:
+import json
 import threading
 import time
 
@@ -8,6 +9,7 @@ from rclpy.callback_groups import ReentrantCallbackGroup
 from rclpy.executors import MultiThreadedExecutor
 from rclpy.node import Node
 from sensor_msgs.msg import JointState
+from std_msgs.msg import String
 from std_srvs.srv import Trigger
 
 # Logic:
@@ -70,6 +72,21 @@ class ArmNode(Node):
         self.declare_parameter("max_step", 3.0)
         self.declare_parameter("step_period_s", 0.05)
         self.declare_parameter("state_rate_hz", 10.0)
+        # IK pick waypoints (arm_kinematics.py). Off until Bryan has
+        # calibrated joint_sign/offset and the mount position.
+        self.declare_parameter("ik_enabled", False)
+        self.declare_parameter("ik_mount_x", 0.115)
+        self.declare_parameter("ik_mount_y", 0.0)
+        self.declare_parameter("ik_mount_height", 0.2155)
+        self.declare_parameter("ik_grasp_height", 0.03)
+        self.declare_parameter("ik_clearance", 0.06)
+        self.declare_parameter("ik_zone_min_x", 0.35)
+        self.declare_parameter("ik_zone_max_x", 0.56)
+        self.declare_parameter("ik_zone_max_abs_y", 0.30)
+        self.declare_parameter("ik_approach_deg", [-90.0, -75.0, -60.0])
+        self.declare_parameter("ik_joint_sign", [1.0, 1.0, 1.0, 1.0])
+        self.declare_parameter("ik_joint_offset", [0.0, 0.0, 0.0, 0.0])
+        self.declare_parameter("target_max_age_s", 1.5)
         for name, pose in al.DEFAULT_POSES.items():
             self.declare_parameter("pose_" + name, list(pose))
 
@@ -87,6 +104,10 @@ class ArmNode(Node):
         self._lock = threading.Lock()
         self._backend = self._open_backend()
         self._busy = False
+        self._target = None
+        self._target_time = 0.0
+        self.create_subscription(
+            String, "/vision/target", self._on_target, 10)
 
         group = ReentrantCallbackGroup()
         self._state_pub = self.create_publisher(
@@ -100,6 +121,49 @@ class ArmNode(Node):
         self.create_timer(
             1.0 / max(rate, 0.1), self._publish_state,
             callback_group=group)
+
+    # Latest detector target (base_x/base_y in base_link):
+    def _on_target(self, msg) -> None:
+        try:
+            data = json.loads(msg.data)
+        except ValueError:
+            return
+        if (isinstance(data, dict) and data.get("base_x") is not None
+                and data.get("base_y") is not None):
+            self._target = (float(data["base_x"]), float(data["base_y"]))
+            self._target_time = time.monotonic()
+
+    # Build the pose table for one pick (IK if enabled and target fresh):
+    def _pick_poses(self):
+        """Return (poses, error). error is None when poses can be used."""
+        if not bool(self.get_parameter("ik_enabled").value):
+            return self._poses, None
+        age = time.monotonic() - self._target_time
+        if (self._target is None
+                or age > float(self.get_parameter("target_max_age_s").value)):
+            return None, "no fresh target with base_x/base_y"
+        g = self.get_parameter
+        cfg = al.PickConfig(
+            mount_x=float(g("ik_mount_x").value),
+            mount_y=float(g("ik_mount_y").value),
+            mount_height=float(g("ik_mount_height").value),
+            grasp_height=float(g("ik_grasp_height").value),
+            clearance=float(g("ik_clearance").value),
+            zone_min_x=float(g("ik_zone_min_x").value),
+            zone_max_x=float(g("ik_zone_max_x").value),
+            zone_max_abs_y=float(g("ik_zone_max_abs_y").value),
+            approach_deg=tuple(g("ik_approach_deg").value),
+            use_degrees=bool(g("use_degrees").value),
+            joint_sign=tuple(g("ik_joint_sign").value),
+            joint_offset=tuple(g("ik_joint_offset").value),
+            gripper_open=float(g("gripper_open").value))
+        poses, why = al.plan_pick_poses(
+            self._target[0], self._target[1], cfg)
+        if poses is None:
+            return None, why
+        merged = dict(self._poses)
+        merged.update(poses)
+        return merged, None
 
     # Open backend:
     def _open_backend(self):
@@ -143,8 +207,15 @@ class ArmNode(Node):
         try:
             grip_open = float(self.get_parameter("gripper_open").value)
             grip_closed = float(self.get_parameter("gripper_closed").value)
+            poses = self._poses
+            if name == "pick":
+                poses, error = self._pick_poses()
+                if error:
+                    res.success = False
+                    res.message = "pick rejected: " + error
+                    return res
             targets = al.plan_sequence(
-                name, self._poses, grip_open, grip_closed)
+                name, poses, grip_open, grip_closed)
             step = float(self.get_parameter("max_step").value)
             period = float(self.get_parameter("step_period_s").value)
             for target in targets:
