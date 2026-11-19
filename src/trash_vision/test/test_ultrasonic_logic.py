@@ -24,28 +24,28 @@ def test_median_filter_rejects_spike():
 
 
 def test_config_skips_unset_pins():
-    names = ["a", "b", "c"]
+    names = ['a', 'b', 'c']
     cfg, problems = ul.build_sensor_config(names, [4, -1, 6], [5, -1, 7])
     assert problems == []
-    assert [c["name"] for c in cfg] == ["a", "c"]
+    assert [c['name'] for c in cfg] == ['a', 'c']
 
 
 def test_config_detects_problems():
-    _, p = ul.build_sensor_config(["a", "b"], [4], [5, 6])
+    _, p = ul.build_sensor_config(['a', 'b'], [4], [5, 6])
     assert p
-    _, p = ul.build_sensor_config(["a", "b"], [4, 4], [5, 6])
-    assert any("pin 4" in x for x in p)
+    _, p = ul.build_sensor_config(['a', 'b'], [4, 4], [5, 6])
+    assert any('pin 4' in x for x in p)
 
 
 def test_nearest_obstacle():
-    assert ul.nearest_obstacle({"a": math.inf, "b": 0.8, "c": 0.4}) == 0.4
-    assert ul.nearest_obstacle({"a": math.inf, "b": -math.inf}) is None
+    assert ul.nearest_obstacle({'a': math.inf, 'b': 0.8, 'c': 0.4}) == 0.4
+    assert ul.nearest_obstacle({'a': math.inf, 'b': -math.inf}) is None
 
 
 def test_sensor_layout():
     assert ul.SENSOR_NAMES == [
-        "front_1", "front_2", "rear_1", "rear_2",
-        "left_1", "left_2", "right_1", "right_2"]
+        'front_1', 'front_2', 'rear_1', 'rear_2',
+        'left_1', 'left_2', 'right_1', 'right_2']
     assert len(set(ul.SENSOR_NAMES)) == 8
     assert ul.FRONT_NAMES + ul.REAR_NAMES + ul.LEFT_NAMES + \
         ul.RIGHT_NAMES == ul.SENSOR_NAMES

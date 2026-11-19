@@ -9,10 +9,10 @@ SPEED_OF_SOUND_M_S = 343.0
 # Layout decided by Bryan (Nov 15, CAD "Curiosity"): 2 front, 2 rear, 2 left,
 # 2 right. Exact positions are a working assumption until Bryan confirms.
 # front_1 is left of front_2 (facing forward); left_*/right_* go front to back.
-FRONT_NAMES = ["front_1", "front_2"]
-REAR_NAMES = ["rear_1", "rear_2"]
-LEFT_NAMES = ["left_1", "left_2"]
-RIGHT_NAMES = ["right_1", "right_2"]
+FRONT_NAMES = ['front_1', 'front_2']
+REAR_NAMES = ['rear_1', 'rear_2']
+LEFT_NAMES = ['left_1', 'left_2']
+RIGHT_NAMES = ['right_1', 'right_2']
 SENSOR_NAMES = FRONT_NAMES + REAR_NAMES + LEFT_NAMES + RIGHT_NAMES
 
 # HC-SR04 datasheet limits.
@@ -65,7 +65,7 @@ def build_sensor_config(names, trig_pins, echo_pins):
     problems = []
     if len(trig_pins) != len(names) or len(echo_pins) != len(names):
         problems.append(
-            "trig_pins/echo_pins must each have %d entries" % len(names))
+            'trig_pins/echo_pins must each have %d entries' % len(names))
         return [], problems
     configured = []
     used = {}
@@ -74,10 +74,10 @@ def build_sensor_config(names, trig_pins, echo_pins):
             continue
         for pin in (trig, echo):
             if pin in used:
-                problems.append("pin %d used by both %s and %s"
+                problems.append('pin %d used by both %s and %s'
                                 % (pin, used[pin], name))
             used[pin] = name
-        configured.append({"name": name, "trig": int(trig), "echo": int(echo)})
+        configured.append({'name': name, 'trig': int(trig), 'echo': int(echo)})
     return configured, problems
 
 

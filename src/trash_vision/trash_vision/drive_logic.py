@@ -13,6 +13,7 @@ _QUAD_TABLE = [
 
 # Quadrature decoder:
 class QuadratureDecoder:
+
     def __init__(self, a: int = 0, b: int = 0) -> None:
         self._state = ((1 if a else 0) << 1) | (1 if b else 0)
         self.count = 0
@@ -61,6 +62,7 @@ def slew(current: float, target: float, max_rate: float, dt: float) -> float:
 
 # Simple PI controller with feed-forward and anti-windup:
 class PIController:
+
     def __init__(self, kp: float, ki: float, limit: float = 1.0) -> None:
         self.kp = kp
         self.ki = ki

@@ -8,12 +8,12 @@ from trash_vision import detection_logic as dl
 # (forward offset m, left offset m, bearing rad CCW from robot heading).
 # Side sensors are staggered fore/aft by an assumed +-0.10 m.
 SENSOR_MOUNT = {
-    "front_1": (0.0, 0.0, 0.20), "front_2": (0.0, 0.0, -0.20),
-    "rear_1": (0.0, 0.0, math.pi - 0.20),
-    "rear_2": (0.0, 0.0, math.pi + 0.20),
-    "left_1": (0.10, 0.0, math.pi / 2), "left_2": (-0.10, 0.0, math.pi / 2),
-    "right_1": (0.10, 0.0, -math.pi / 2),
-    "right_2": (-0.10, 0.0, -math.pi / 2),
+    'front_1': (0.0, 0.0, 0.20), 'front_2': (0.0, 0.0, -0.20),
+    'rear_1': (0.0, 0.0, math.pi - 0.20),
+    'rear_2': (0.0, 0.0, math.pi + 0.20),
+    'left_1': (0.10, 0.0, math.pi / 2), 'left_2': (-0.10, 0.0, math.pi / 2),
+    'right_1': (0.10, 0.0, -math.pi / 2),
+    'right_2': (-0.10, 0.0, -math.pi / 2),
 }
 SENSOR_BEARINGS = {n: m[2] for n, m in SENSOR_MOUNT.items()}
 SENSOR_MAX_RANGE = 2.0
@@ -58,7 +58,7 @@ class SimWorld:
         dx, dy = math.cos(a), math.sin(a)
         ox = self.x + forward * math.cos(self.yaw) - left * math.sin(self.yaw)
         oy = self.y + forward * math.sin(self.yaw) + left * math.cos(self.yaw)
-        best = float("inf")
+        best = float('inf')
         if dx > 1e-9:
             best = min(best, (self.width - ox) / dx)
         elif dx < -1e-9:
@@ -67,10 +67,10 @@ class SimWorld:
             best = min(best, (self.height - oy) / dy)
         elif dy < -1e-9:
             best = min(best, -oy / dy)
-        return best if best <= SENSOR_MAX_RANGE else float("inf")
+        return best if best <= SENSOR_MAX_RANGE else float('inf')
 
     def ranges(self):
-        """Dict sensor name -> distance in metres (inf = nothing seen)."""
+        """Return a dict of sensor name -> distance in metres (inf = nothing seen)."""
         return {n: self.range_at(b, f, lf)
                 for n, (f, lf, b) in SENSOR_MOUNT.items()}
 
@@ -100,27 +100,27 @@ class SimWorld:
         half = 20.0
         return dl.build_target(cx - half, floor_y - 2 * half, cx + half,
                                floor_y, width, height, 0.9,
-                               frame_number, deadband, source="sim")
+                               frame_number, deadband, source='sim')
 
     def pick(self):
         """Try to pick litter in reach. Returns (success, message)."""
         if self.held:
-            return False, "already holding"
+            return False, 'already holding'
         seen = self.nearest_visible()
         if seen is None or seen[0] > PICK_REACH:
-            return False, "nothing in reach"
+            return False, 'nothing in reach'
         for item in list(self.litter):
             d, b = self._polar(item)
             if abs(d - seen[0]) < 1e-9 and abs(b - seen[1]) < 1e-9:
                 self.litter.remove(item)
                 break
         self.held = True
-        return True, "item held"
+        return True, 'item held'
 
     def deposit(self):
         """Drop the held item into the bin."""
         if not self.held:
-            return False, "nothing held"
+            return False, 'nothing held'
         self.held = False
         self.collected += 1
-        return True, "deposited"
+        return True, 'deposited'
