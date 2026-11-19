@@ -9,19 +9,19 @@ import math
 
 DEFAULTS = {
     # "lawnmower" (odometry rows) or "spin" (old behavior, no odometry).
-    "search_pattern": "lawnmower",
-    "search_area_length": 4.0,   # m along the start heading; TODO: Bryan
-    "search_area_width": 4.0,    # m across the start heading; TODO: Bryan
-    "search_edge_margin": 0.3,   # m kept clear of the area edge
+    'search_pattern': 'lawnmower',
+    'search_area_length': 4.0,   # m along the start heading; TODO: Bryan
+    'search_area_width': 4.0,    # m across the start heading; TODO: Bryan
+    'search_edge_margin': 0.3,   # m kept clear of the area edge
     # 0 = derive from the camera field of view (see row_spacing_from_fov).
-    "search_row_spacing": 0.0,
-    "search_detect_range": 1.5,  # m at which a can is reliably seen; guess
-    "search_row_overlap": 0.2,   # fraction of overlap between sweeps
+    'search_row_spacing': 0.0,
+    'search_detect_range': 1.5,  # m at which a can is reliably seen; guess
+    'search_row_overlap': 0.2,   # fraction of overlap between sweeps
     # from CAD V16-18 per STATE.md, not measured:
-    "search_camera_hfov_deg": 66.0,
-    "search_speed": 0.2,         # m/s along a row
-    "search_waypoint_tolerance": 0.15,  # m, waypoint counts as reached
-    "search_stuck_timeout": 10.0,  # s without progress, skip the waypoint
+    'search_camera_hfov_deg': 66.0,
+    'search_speed': 0.2,         # m/s along a row
+    'search_waypoint_tolerance': 0.15,  # m, waypoint counts as reached
+    'search_stuck_timeout': 10.0,  # s without progress, skip the waypoint
 }
 
 
@@ -32,6 +32,7 @@ def row_spacing_from_fov(hfov_deg, detect_range, overlap):
 
 
 def wrap(angle):
+    """Wrap an angle in radians to [-pi, pi]."""
     return math.atan2(math.sin(angle), math.cos(angle))
 
 
@@ -65,6 +66,7 @@ class LawnmowerSearch:
     """Drive through the waypoints; skip one that makes no progress."""
 
     def __init__(self, params=None):
+        """Create the search from optional parameter overrides."""
         self.p = dict(DEFAULTS)
         if params:
             self.p.update({k: v for k, v in params.items() if k in DEFAULTS})
@@ -78,20 +80,21 @@ class LawnmowerSearch:
         self._last_step = -math.inf
 
     def spacing(self):
+        """Return the row spacing in metres."""
         p = self.p
-        if p["search_row_spacing"] > 0:
-            return float(p["search_row_spacing"])
+        if p['search_row_spacing'] > 0:
+            return float(p['search_row_spacing'])
         return row_spacing_from_fov(
-            p["search_camera_hfov_deg"], p["search_detect_range"],
-            p["search_row_overlap"])
+            p['search_camera_hfov_deg'], p['search_detect_range'],
+            p['search_row_overlap'])
 
     def _ensure(self, pose):
         if self.waypoints:
             return
         p = self.p
         self.waypoints = build_waypoints(
-            (pose[0], pose[1]), p["search_area_length"],
-            p["search_area_width"], self.spacing(), p["search_edge_margin"])
+            (pose[0], pose[1]), p['search_area_length'],
+            p['search_area_width'], self.spacing(), p['search_edge_margin'])
         self.index = 0
         self._best_dist = math.inf
         self._progress_time = None
@@ -106,6 +109,7 @@ class LawnmowerSearch:
 
     @property
     def target(self):
+        """Return the current waypoint, or None if there are none."""
         return self.waypoints[self.index] if self.waypoints else None
 
     def step(self, pose, now):
@@ -121,7 +125,7 @@ class LawnmowerSearch:
         wx, wy = self.waypoints[self.index]
         dx, dy = wx - pose[0], wy - pose[1]
         dist = math.hypot(dx, dy)
-        if dist <= p["search_waypoint_tolerance"]:
+        if dist <= p['search_waypoint_tolerance']:
             self._next()
             return 0.0, 0.0
         if self._progress_time is None:
@@ -129,12 +133,12 @@ class LawnmowerSearch:
         if dist < self._best_dist - 0.05:
             self._best_dist = dist
             self._progress_time = now
-        elif now - self._progress_time > p["search_stuck_timeout"]:
+        elif now - self._progress_time > p['search_stuck_timeout']:
             self.skipped += 1
             self._next()
             return 0.0, 0.0
         err = wrap(math.atan2(dy, dx) - pose[2])
-        speed = float(p["search_speed"])
+        speed = float(p['search_speed'])
         angular = max(-0.8, min(0.8, 1.5 * err))
         if abs(err) > 0.5:
             return 0.0, angular if angular else 0.3
@@ -146,7 +150,7 @@ class LawnmowerSearch:
             return
         if self._blocked_since is None:
             self._blocked_since = now
-        elif now - self._blocked_since > self.p["search_stuck_timeout"]:
+        elif now - self._blocked_since > self.p['search_stuck_timeout']:
             self.skipped += 1
             self._next()
             self._blocked_since = None
@@ -161,6 +165,7 @@ class CoverageGrid:
     """Fraction of a rectangle the camera has swept (for tests and logs)."""
 
     def __init__(self, x_min, x_max, y_min, y_max, cell=0.1):
+        """Create an empty grid over the given area with square cells."""
         self.x_min, self.y_min, self.cell = x_min, y_min, cell
         self.nx = max(1, int(math.ceil((x_max - x_min) / cell)))
         self.ny = max(1, int(math.ceil((y_max - y_min) / cell)))
@@ -183,4 +188,5 @@ class CoverageGrid:
                     self._seen.add((i, j))
 
     def fraction(self):
+        """Return the fraction of cells visited, 0..1."""
         return len(self._seen) / float(self.nx * self.ny)
