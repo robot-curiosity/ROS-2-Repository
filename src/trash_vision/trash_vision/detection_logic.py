@@ -6,30 +6,30 @@ import re
 from trash_vision import ground_projection
 
 GPT_PROMPT = (
-    "You are the vision system of a litter-collecting robot. Find the single "
-    "most prominent piece of litter on the ground in this image. Reply with "
-    "JSON only: {\"found\": true|false, \"x1\": f, \"y1\": f, \"x2\": f, "
-    "\"y2\": f, \"confidence\": f} where coordinates are normalized 0..1 "
-    "(origin top-left) and confidence is 0..1."
+    'You are the vision system of a litter-collecting robot. Find the single '
+    'most prominent piece of litter on the ground in this image. Reply with '
+    'JSON only: {"found": true|false, "x1": f, "y1": f, "x2": f, '
+    '"y2": f, "confidence": f} where coordinates are normalized 0..1 '
+    '(origin top-left) and confidence is 0..1.'
 )
 
 
 def get_direction(horizontal_error, deadband):
     """Return LEFT / RIGHT / CENTER for a normalized horizontal error."""
     if horizontal_error < -deadband:
-        return "LEFT"
+        return 'LEFT'
     if horizontal_error > deadband:
-        return "RIGHT"
-    return "CENTER"
+        return 'RIGHT'
+    return 'CENTER'
 
 
 def center_x_for_floor(x1, x2, width):
-    """Normalized horizontal centre of a box."""
+    """Return the normalized horizontal centre of a box."""
     return (x1 + x2) / 2.0 / width
 
 
 def build_target(x1, y1, x2, y2, width, height, confidence,
-                 frame_number, deadband, source="yolo", camera=None):
+                 frame_number, deadband, source='yolo', camera=None):
     """Build the target dict published on /vision/target (pixel bbox in).
 
     ``base_x``/``base_y`` are the floor point in base_link metres (None if
@@ -45,27 +45,27 @@ def build_target(x1, y1, x2, y2, width, height, confidence,
     horizontal_error = center_x - 0.5
     direction = get_direction(horizontal_error, deadband)
     return {
-        "detected": True,
-        "source": source,
-        "frame_number": frame_number,
-        "confidence": round(float(confidence), 4),
-        "bbox_pixels": {
-            "x1": round(x1, 1), "y1": round(y1, 1),
-            "x2": round(x2, 1), "y2": round(y2, 1),
+        'detected': True,
+        'source': source,
+        'frame_number': frame_number,
+        'confidence': round(float(confidence), 4),
+        'bbox_pixels': {
+            'x1': round(x1, 1), 'y1': round(y1, 1),
+            'x2': round(x2, 1), 'y2': round(y2, 1),
         },
-        "center_normalized": {"x": round(center_x, 4), "y": round(center_y, 4)},
-        "floor_point_normalized": {
-            "x": round(center_x, 4), "y": round(y2 / height, 4)},
-        "horizontal_error": round(horizontal_error, 4),
-        "direction": direction,
-        "base_x": None if floor_xy is None else round(floor_xy[0], 4),
-        "base_y": None if floor_xy is None else round(floor_xy[1], 4),
+        'center_normalized': {'x': round(center_x, 4), 'y': round(center_y, 4)},
+        'floor_point_normalized': {
+            'x': round(center_x, 4), 'y': round(y2 / height, 4)},
+        'horizontal_error': round(horizontal_error, 4),
+        'direction': direction,
+        'base_x': None if floor_xy is None else round(floor_xy[0], 4),
+        'base_y': None if floor_xy is None else round(floor_xy[1], 4),
     }
 
 
 def build_no_target(frame_number):
     """Target dict for a frame with nothing detected."""
-    return {"detected": False, "frame_number": frame_number}
+    return {'detected': False, 'frame_number': frame_number}
 
 
 def should_use_fallback(num_yolo_boxes, best_confidence, now, last_call_time,
@@ -82,21 +82,21 @@ def should_use_fallback(num_yolo_boxes, best_confidence, now, last_call_time,
 
 def encode_jpeg_base64(jpeg_bytes):
     """Base64 text of JPEG bytes, for the OpenAI image_url data URI."""
-    return base64.b64encode(jpeg_bytes).decode("ascii")
+    return base64.b64encode(jpeg_bytes).decode('ascii')
 
 
-def build_gpt_payload(jpeg_b64, model="gpt-4o"):
+def build_gpt_payload(jpeg_b64, model='gpt-4o'):
     """Chat-completions request body asking GPT-4o to locate litter."""
     return {
-        "model": model,
-        "max_tokens": 120,
-        "temperature": 0,
-        "messages": [{
-            "role": "user",
-            "content": [
-                {"type": "text", "text": GPT_PROMPT},
-                {"type": "image_url", "image_url": {
-                    "url": "data:image/jpeg;base64," + jpeg_b64}},
+        'model': model,
+        'max_tokens': 120,
+        'temperature': 0,
+        'messages': [{
+            'role': 'user',
+            'content': [
+                {'type': 'text', 'text': GPT_PROMPT},
+                {'type': 'image_url', 'image_url': {
+                    'url': 'data:image/jpeg;base64,' + jpeg_b64}},
             ],
         }],
     }
@@ -110,18 +110,18 @@ def parse_gpt_response(text):
     """
     if not text:
         return None
-    match = re.search(r"\{.*\}", text, re.DOTALL)
+    match = re.search(r'\{.*\}', text, re.DOTALL)
     if match is None:
         return None
     try:
         data = json.loads(match.group(0))
     except ValueError:
         return None
-    if not isinstance(data, dict) or data.get("found") is not True:
+    if not isinstance(data, dict) or data.get('found') is not True:
         return None
     try:
-        x1, y1, x2, y2 = (float(data[k]) for k in ("x1", "y1", "x2", "y2"))
-        confidence = float(data.get("confidence", 0.5))
+        x1, y1, x2, y2 = (float(data[k]) for k in ('x1', 'y1', 'x2', 'y2'))
+        confidence = float(data.get('confidence', 0.5))
     except (KeyError, TypeError, ValueError):
         return None
     if not all(0.0 <= v <= 1.0 for v in (x1, y1, x2, y2)):
@@ -129,4 +129,4 @@ def parse_gpt_response(text):
     if x2 <= x1 or y2 <= y1:
         return None
     confidence = min(max(confidence, 0.0), 1.0)
-    return {"x1": x1, "y1": y1, "x2": x2, "y2": y2, "confidence": confidence}
+    return {'x1': x1, 'y1': y1, 'x2': x2, 'y2': y2, 'confidence': confidence}

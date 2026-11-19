@@ -1,6 +1,7 @@
-from setuptools import find_packages, setup
-import os
 from glob import glob
+import os
+
+from setuptools import find_packages, setup
 
 package_name = 'trash_vision'
 
@@ -28,20 +29,20 @@ setup(
     },
     entry_points={
         'console_scripts': [
-            "detector = trash_vision.detector_node:main",
-            "ultrasonic = trash_vision.ultrasonic_node:main",
-            "drive = trash_vision.drive_node:main",
-            "arm = trash_vision.arm_node:main",
-            "gps_imu = trash_vision.gps_imu_node:main",
-            "behavior = trash_vision.behavior_node:main",
-            "sim = trash_vision.sim_node:main",
-            "hardware_check = trash_vision.hardware_check:main",
-            "calibrate_encoders = trash_vision.calibrate:main_encoders",
-            "calibrate_drive = trash_vision.calibrate:main_drive",
-            "calibrate_pick_zone = trash_vision.calibrate:main_pick_zone",
-            "calibrate_camera = trash_vision.calibrate:main_camera",
-            "trial_summary = trash_vision.trial_summary:main",
-            "sonar_test = trash_vision.calibrate:main_sonar",
+            'detector = trash_vision.detector_node:main',
+            'ultrasonic = trash_vision.ultrasonic_node:main',
+            'drive = trash_vision.drive_node:main',
+            'arm = trash_vision.arm_node:main',
+            'gps_imu = trash_vision.gps_imu_node:main',
+            'behavior = trash_vision.behavior_node:main',
+            'sim = trash_vision.sim_node:main',
+            'hardware_check = trash_vision.hardware_check:main',
+            'calibrate_encoders = trash_vision.calibrate:main_encoders',
+            'calibrate_drive = trash_vision.calibrate:main_drive',
+            'calibrate_pick_zone = trash_vision.calibrate:main_pick_zone',
+            'calibrate_camera = trash_vision.calibrate:main_camera',
+            'trial_summary = trash_vision.trial_summary:main',
+            'sonar_test = trash_vision.calibrate:main_sonar',
         ],
     },
 )
