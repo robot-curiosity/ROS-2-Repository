@@ -1,7 +1,7 @@
 """Pure-Python helpers for the HC-SR04 ultrasonic node (no ROS needed)."""
 
-import math
 from collections import deque
+import math
 
 SPEED_OF_SOUND_M_S = 343.0
 
