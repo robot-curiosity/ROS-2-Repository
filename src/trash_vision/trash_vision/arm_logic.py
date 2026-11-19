@@ -1,31 +1,31 @@
 """Pure-Python helpers for the SO101 arm node (no ROS or LeRobot needed)."""
-import math
 from dataclasses import dataclass
+import math
 
 from trash_vision import arm_kinematics as ak
 
 JOINT_NAMES = [
-    "shoulder_pan", "shoulder_lift", "elbow_flex",
-    "wrist_flex", "wrist_roll", "gripper",
+    'shoulder_pan', 'shoulder_lift', 'elbow_flex',
+    'wrist_flex', 'wrist_roll', 'gripper',
 ]
 
 # Placeholder poses in the units of the backend (degrees if use_degrees).
 # TODO: Bryan to calibrate these on the real arm.
 DEFAULT_POSES = {
-    "stow": [0.0, -90.0, 90.0, 60.0, 0.0, 0.0],
-    "pre_grasp": [0.0, -30.0, 60.0, 30.0, 0.0, 50.0],
-    "grasp": [0.0, 0.0, 45.0, 20.0, 0.0, 50.0],
-    "lift": [0.0, -40.0, 60.0, 30.0, 0.0, 0.0],
-    "deposit": [90.0, -30.0, 60.0, 30.0, 0.0, 50.0],
+    'stow': [0.0, -90.0, 90.0, 60.0, 0.0, 0.0],
+    'pre_grasp': [0.0, -30.0, 60.0, 30.0, 0.0, 50.0],
+    'grasp': [0.0, 0.0, 45.0, 20.0, 0.0, 50.0],
+    'lift': [0.0, -40.0, 60.0, 30.0, 0.0, 0.0],
+    'deposit': [90.0, -30.0, 60.0, 30.0, 0.0, 50.0],
 }
 
 # Sequences of (pose name, gripper override or None).
 SEQUENCES = {
-    "pick": [("pre_grasp", None), ("grasp", None), ("grasp", "close"),
-             ("lift", "close"), ("stow", "close")],
-    "deposit": [("deposit", "close"), ("deposit", "open"),
-                ("stow", "close")],
-    "stow": [("stow", None)],
+    'pick': [('pre_grasp', None), ('grasp', None), ('grasp', 'close'),
+             ('lift', 'close'), ('stow', 'close')],
+    'deposit': [('deposit', 'close'), ('deposit', 'open'),
+                ('stow', 'close')],
+    'stow': [('stow', None)],
 }
 
 
@@ -42,7 +42,7 @@ def clamp_pose(pose, limits):
 def validate_pose(pose, n=len(JOINT_NAMES)):
     """Return an error string for a bad pose, or None if it is fine."""
     if len(pose) != n:
-        return "pose needs %d values, got %d" % (n, len(pose))
+        return 'pose needs %d values, got %d' % (n, len(pose))
     return None
 
 
@@ -89,16 +89,16 @@ def plan_sequence(name, poses, gripper_open, gripper_closed):
     targets = []
     for pose_name, grip in SEQUENCES[name]:
         pose = list(poses[pose_name])
-        if grip == "open":
+        if grip == 'open':
             pose[-1] = gripper_open
-        elif grip == "close":
+        elif grip == 'close':
             pose[-1] = gripper_closed
         targets.append(pose)
     return targets
 
 
 def grasp_held(gripper_pos, gripper_closed, min_gap):
-    """True if the gripper stopped open by at least min_gap (holding item)."""
+    """Return True if the gripper stopped open by at least min_gap (holding item)."""
     return gripper_pos - gripper_closed >= min_gap
 
 
@@ -151,9 +151,9 @@ def plan_pick_poses(base_x, base_y, cfg=None):
     """
     cfg = PickConfig() if cfg is None else cfg
     if not (cfg.zone_min_x <= base_x <= cfg.zone_max_x):
-        return None, "outside pick zone (x %.2f m)" % base_x
+        return None, 'outside pick zone (x %.2f m)' % base_x
     if abs(base_y) > cfg.zone_max_abs_y:
-        return None, "outside pick zone (y %.2f m)" % base_y
+        return None, 'outside pick zone (y %.2f m)' % base_y
     dx = base_x - cfg.mount_x
     dy = base_y - cfg.mount_y
     z_grasp = cfg.grasp_height - cfg.mount_height
@@ -166,8 +166,8 @@ def plan_pick_poses(base_x, base_y, cfg=None):
         if s_grasp is None or s_above is None:
             continue
         return {
-            "pre_grasp": _pose(s_above, cfg, cfg.gripper_open),
-            "grasp": _pose(s_grasp, cfg, cfg.gripper_open),
-            "lift": _pose(s_above, cfg, 0.0),
-        }, "ok"
-    return None, "target not reachable by the arm"
+            'pre_grasp': _pose(s_above, cfg, cfg.gripper_open),
+            'grasp': _pose(s_grasp, cfg, cfg.gripper_open),
+            'lift': _pose(s_above, cfg, 0.0),
+        }, 'ok'
+    return None, 'target not reachable by the arm'

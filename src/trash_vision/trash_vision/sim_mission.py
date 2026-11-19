@@ -9,7 +9,7 @@ from trash_vision import sim_logic as sl
 from trash_vision import trial_log as tl
 
 # Seconds the simulated arm takes per action (sim only, not measured).
-ARM_DURATION = {"pick": 2.0, "deposit": 1.5, "stow": 1.0}
+ARM_DURATION = {'pick': 2.0, 'deposit': 1.5, 'stow': 1.0}
 
 # Scripted scenario: 8 items in the open plus 4 near walls (0.3 m) so the
 # side and front sonars matter. World is 4 m x 4 m, robot starts at centre.
@@ -25,12 +25,12 @@ class CoverageGrid:
     """Tracks how much of the search area the simulated camera has swept."""
 
     def __init__(self, world, p):
-        half_l = p["search_area_length"] / 2.0
-        half_w = p["search_area_width"] / 2.0
+        half_l = p['search_area_length'] / 2.0
+        half_w = p['search_area_width'] / 2.0
         self._cx, self._cy = world.x, world.y
         self.grid = sp.CoverageGrid(-half_l, half_l, -half_w, half_w)
-        self._range = p["search_detect_range"]
-        self._hfov = p["search_camera_hfov_deg"]
+        self._range = p['search_detect_range']
+        self._hfov = p['search_camera_hfov_deg']
 
     def update(self, world):
         self.grid.mark((world.x - self._cx, world.y - self._cy, world.yaw),
@@ -41,7 +41,7 @@ class CoverageGrid:
 
 
 def run_search_only(duration=300.0, **kwargs):
-    """No litter: how much area does the search pattern sweep?"""
+    """Run with no litter and report how much area the search sweeps."""
     return run_mission([], duration=duration, search_only=True, **kwargs)
 
 
@@ -55,7 +55,7 @@ def run_mission(litter, duration=600.0, dt=0.05, width=4.0, height=4.0,
     """
     world = sl.SimWorld(width, height, litter, x=width / 2, y=height / 2)
     machine = bl.BehaviorMachine(params)
-    recorder = (tl.TrialRecorder(machine, recorder_sink, "sim")
+    recorder = (tl.TrialRecorder(machine, recorder_sink, 'sim')
                 if recorder_sink else None)
     total = len(world.litter)
     cov_params = dict(sp.DEFAULTS)
@@ -71,9 +71,9 @@ def run_mission(litter, duration=600.0, dt=0.05, width=4.0, height=4.0,
         if pending and now >= pending[1]:
             action = pending[0]
             pending = None
-            if action == "pick":
+            if action == 'pick':
                 ok, _ = world.pick()
-            elif action == "deposit":
+            elif action == 'deposit':
                 ok, _ = world.deposit()
             else:
                 ok = True
@@ -84,8 +84,8 @@ def run_mission(litter, duration=600.0, dt=0.05, width=4.0, height=4.0,
         target = world.target(frame)
         cmd = machine.step(
             now, target,
-            [r["front_1"], r["front_2"]], [r["rear_1"], r["rear_2"]],
-            [r["left_1"], r["left_2"]], [r["right_1"], r["right_2"]],
+            [r['front_1'], r['front_2']], [r['rear_1'], r['rear_2']],
+            [r['left_1'], r['left_2']], [r['right_1'], r['right_2']],
             pose=(world.x - width / 2, world.y - height / 2, world.yaw))
         if recorder:
             recorder.update(now, target)
@@ -101,7 +101,7 @@ def run_mission(litter, duration=600.0, dt=0.05, width=4.0, height=4.0,
         coverage.update(world)
         now += dt
     collected = world.collected
-    return {"total": total, "collected": collected,
-            "fraction": collected / total if total else 1.0,
-            "duration": now, "states": visits,
-            "coverage": coverage.fraction()}
+    return {'total': total, 'collected': collected,
+            'fraction': collected / total if total else 1.0,
+            'duration': now, 'states': visits,
+            'coverage': coverage.fraction()}
