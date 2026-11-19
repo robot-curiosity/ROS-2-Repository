@@ -61,15 +61,15 @@ def test_camera_from_degrees():
 
 def test_build_target_has_base_xy_and_old_fields():
     t = dl.build_target(300, 300, 340, 470, 640, 480, 0.9, 1, 0.12)
-    for key in ("floor_point_normalized", "direction", "horizontal_error"):
+    for key in ('floor_point_normalized', 'direction', 'horizontal_error'):
         assert key in t
-    assert t["base_x"] is not None and t["base_y"] is not None
-    assert 0.6 < t["base_x"] < 0.8
+    assert t['base_x'] is not None and t['base_y'] is not None
+    assert 0.6 < t['base_x'] < 0.8
     json.dumps(t)
 
 
 def test_build_target_above_horizon_gives_null():
     cam = gp.CameraModel(pitch_rad=0.0)
     t = dl.build_target(300, 10, 340, 100, 640, 480, 0.9, 1, 0.12, camera=cam)
-    assert t["base_x"] is None and t["base_y"] is None
+    assert t['base_x'] is None and t['base_y'] is None
     json.dumps(t)

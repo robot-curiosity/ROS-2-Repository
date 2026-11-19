@@ -27,9 +27,9 @@ BNO055_ACC_SCALE = 1.0 / 100.0
 def nmea_checksum_ok(sentence):
     """Return True if an NMEA sentence ('$....*HH') has a valid checksum."""
     sentence = sentence.strip()
-    if not sentence.startswith("$") or "*" not in sentence:
+    if not sentence.startswith('$') or '*' not in sentence:
         return False
-    body, _, given = sentence[1:].partition("*")
+    body, _, given = sentence[1:].partition('*')
     calc = 0
     for ch in body:
         calc ^= ord(ch)
@@ -50,7 +50,7 @@ def _dm_to_degrees(value, hemisphere):
     degrees = int(raw // 100)
     minutes = raw - degrees * 100
     result = degrees + minutes / 60.0
-    if hemisphere in ("S", "W"):
+    if hemisphere in ('S', 'W'):
         result = -result
     return result
 
@@ -69,8 +69,8 @@ def parse_gga(sentence):
     """
     if not nmea_checksum_ok(sentence):
         return None
-    fields = sentence.strip()[1:].split("*")[0].split(",")
-    if len(fields) < 10 or not fields[0].endswith("GGA"):
+    fields = sentence.strip()[1:].split('*')[0].split(',')
+    if len(fields) < 10 or not fields[0].endswith('GGA'):
         return None
     try:
         quality = int(fields[6] or 0)
@@ -89,10 +89,10 @@ def parse_gga(sentence):
         sats = 0
     hdop = _to_float(fields[8])
     return {
-        "lat": lat, "lon": lon,
-        "alt": alt if alt is not None else 0.0,
-        "quality": quality, "satellites": sats,
-        "hdop": hdop if hdop is not None else 99.0,
+        'lat': lat, 'lon': lon,
+        'alt': alt if alt is not None else 0.0,
+        'quality': quality, 'satellites': sats,
+        'hdop': hdop if hdop is not None else 99.0,
     }
 
 
@@ -135,7 +135,7 @@ def normalize_quaternion(q):
 
 def bno055_decode_quaternion(data):
     """Decode 8 bytes (w, x, y, z int16 LE) to a unit (x, y, z, w) or None."""
-    w, x, y, z = struct.unpack("<hhhh", bytes(data[:8]))
+    w, x, y, z = struct.unpack('<hhhh', bytes(data[:8]))
     return normalize_quaternion(
         (x * BNO055_QUAT_SCALE, y * BNO055_QUAT_SCALE,
          z * BNO055_QUAT_SCALE, w * BNO055_QUAT_SCALE))
@@ -143,7 +143,7 @@ def bno055_decode_quaternion(data):
 
 def bno055_decode_vec3(data, scale):
     """Decode 6 bytes (x, y, z int16 LE) times scale."""
-    x, y, z = struct.unpack("<hhh", bytes(data[:6]))
+    x, y, z = struct.unpack('<hhh', bytes(data[:6]))
     return (x * scale, y * scale, z * scale)
 
 

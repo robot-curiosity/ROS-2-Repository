@@ -54,6 +54,7 @@ def in_region(candidate: Candidate, regions: Sequence[tuple]) -> bool:
 
 
 class _Track:
+
     def __init__(self, center, window):
         self.center = center
         self.history = deque(maxlen=window)

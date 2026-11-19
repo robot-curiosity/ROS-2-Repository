@@ -8,39 +8,39 @@ def _sentence(body):
     calc = 0
     for ch in body:
         calc ^= ord(ch)
-    return "$%s*%02X" % (body, calc)
+    return '$%s*%02X' % (body, calc)
 
 
-GGA = _sentence("GPGGA,123519,3404.7040,N,11815.0000,W,1,08,0.9,100.0,M,,M,,")
+GGA = _sentence('GPGGA,123519,3404.7040,N,11815.0000,W,1,08,0.9,100.0,M,,M,,')
 
 
 def test_checksum():
     assert gl.nmea_checksum_ok(GGA)
-    assert not gl.nmea_checksum_ok(GGA[:-2] + "00")
-    assert not gl.nmea_checksum_ok("garbage")
+    assert not gl.nmea_checksum_ok(GGA[:-2] + '00')
+    assert not gl.nmea_checksum_ok('garbage')
 
 
 def test_parse_gga():
     fix = gl.parse_gga(GGA)
-    assert abs(fix["lat"] - (34 + 4.704 / 60)) < 1e-9
-    assert abs(fix["lon"] + (118 + 15.0 / 60)) < 1e-9
-    assert fix["alt"] == 100.0
-    assert fix["satellites"] == 8
-    assert fix["hdop"] == 0.9
+    assert abs(fix['lat'] - (34 + 4.704 / 60)) < 1e-9
+    assert abs(fix['lon'] + (118 + 15.0 / 60)) < 1e-9
+    assert fix['alt'] == 100.0
+    assert fix['satellites'] == 8
+    assert fix['hdop'] == 0.9
 
 
 def test_parse_gga_no_fix_and_bad():
-    nofix = _sentence("GPGGA,123519,,,,,0,00,99.9,,M,,M,,")
+    nofix = _sentence('GPGGA,123519,,,,,0,00,99.9,,M,,M,,')
     assert gl.parse_gga(nofix) is None
-    assert gl.parse_gga(_sentence("GPRMC,1,2,3")) is None
-    assert gl.parse_gga("$GPGGA,bad*00") is None
+    assert gl.parse_gga(_sentence('GPRMC,1,2,3')) is None
+    assert gl.parse_gga('$GPGGA,bad*00') is None
 
 
 def test_south_hemisphere_negative():
-    s = _sentence("GPGGA,1,3000.0,S,01000.0,E,1,05,1.0,5.0,M,,M,,")
+    s = _sentence('GPGGA,1,3000.0,S,01000.0,E,1,05,1.0,5.0,M,,M,,')
     fix = gl.parse_gga(s)
-    assert fix["lat"] == -30.0
-    assert fix["lon"] == 10.0
+    assert fix['lat'] == -30.0
+    assert fix['lon'] == 10.0
 
 
 def test_fix_status():
@@ -70,13 +70,13 @@ def test_normalize_quaternion():
 
 
 def test_bno055_decode():
-    data = struct.pack("<hhhh", 16384, 0, 0, 0)
+    data = struct.pack('<hhhh', 16384, 0, 0, 0)
     assert gl.bno055_decode_quaternion(data) == (0.0, 0.0, 0.0, 1.0)
     assert gl.bno055_decode_quaternion(bytes(8)) is None
     gyr = gl.bno055_decode_vec3(
-        struct.pack("<hhh", 16, 0, -16), gl.BNO055_GYR_SCALE)
+        struct.pack('<hhh', 16, 0, -16), gl.BNO055_GYR_SCALE)
     assert abs(gyr[0] - math.radians(1.0)) < 1e-9
     assert abs(gyr[2] + math.radians(1.0)) < 1e-9
     acc = gl.bno055_decode_vec3(
-        struct.pack("<hhh", 0, 0, 981), gl.BNO055_ACC_SCALE)
+        struct.pack('<hhh', 0, 0, 981), gl.BNO055_ACC_SCALE)
     assert abs(acc[2] - 9.81) < 1e-9
