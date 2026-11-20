@@ -38,3 +38,4 @@
 2026-11-20 [agent] item 25 run 10: flake8 (+docstrings, single quotes, google import order, max-line 99) clean on sim_node, ultrasonic_node, gps_imu_node; pytest 238 passed (ament style tests excluded); CI-style flake8 E9,F clean. No behavior change.
 2026-11-20 | [agent] style cleanup run 11 (drive_node, behavior_node, arm_node) | local flake8 + docstring/quote/import-order plugins clean on those files (I201 noise excluded, same as already-clean modules), CI-style flake8 E9,F clean, pytest 238 passed (ament style tests excluded)
 - 2026-11-20: item 25 run 12 (detector_node, calibrate style cleanup): flake8 (+docstrings, quotes, import-order google) clean on both; errors-only flake8 clean; pytest 238 passed (ament linter tests ignored, ament not installed).
+- 2026-11-20: item 26 (package.xml hygiene): pytest 241 passed (ament linter tests ignored); flake8 not installable-checked, new test file is plain. No behavior change.
