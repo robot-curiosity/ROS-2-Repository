@@ -2,51 +2,51 @@
 import json
 import math
 
-# ROS:
-import rclpy
 from geometry_msgs.msg import Twist
 from nav_msgs.msg import Odometry
+import rclpy
 from rclpy.node import Node
 from sensor_msgs.msg import Range
 from std_msgs.msg import String
 from std_srvs.srv import Trigger
 
-# Logic:
 from trash_vision import sim_logic as sl
 
 
 # Sim node: stands in for drive, ultrasonic, detector and arm:
 class SimNode(Node):
+    """Simulated robot stand-in for drive, ultrasonic, detector and arm."""
+
     # Initialization:
     def __init__(self) -> None:
-        super().__init__("sim")
-        self.declare_parameter("rate_hz", 20.0)
-        self.declare_parameter("world_width", 4.0)
-        self.declare_parameter("world_height", 4.0)
+        super().__init__('sim')
+        self.declare_parameter('rate_hz', 20.0)
+        self.declare_parameter('world_width', 4.0)
+        self.declare_parameter('world_height', 4.0)
         # Flat list [x1, y1, x2, y2, ...] of litter positions in metres.
-        self.declare_parameter("litter", [1.0, 1.0, 3.0, 2.5, 1.5, 3.2])
-        flat = list(self.get_parameter("litter").value)
+        self.declare_parameter('litter', [1.0, 1.0, 3.0, 2.5, 1.5, 3.2])
+        flat = list(self.get_parameter('litter').value)
         litter = list(zip(flat[0::2], flat[1::2]))
-        w = float(self.get_parameter("world_width").value)
-        h = float(self.get_parameter("world_height").value)
+        w = float(self.get_parameter('world_width').value)
+        h = float(self.get_parameter('world_height').value)
         self._world = sl.SimWorld(w, h, litter, x=w / 2, y=h / 2)
         self._v = 0.0
         self._w = 0.0
         self._frame = 0
         self._last = self._now()
 
-        self.create_subscription(Twist, "cmd_vel", self._on_cmd, 10)
-        self._odom_pub = self.create_publisher(Odometry, "odom", 10)
-        self._target_pub = self.create_publisher(String, "/vision/target", 10)
+        self.create_subscription(Twist, 'cmd_vel', self._on_cmd, 10)
+        self._odom_pub = self.create_publisher(Odometry, 'odom', 10)
+        self._target_pub = self.create_publisher(String, '/vision/target', 10)
         self._range_pubs = {
-            n: self.create_publisher(Range, "/ultrasonic/" + n, 10)
+            n: self.create_publisher(Range, '/ultrasonic/' + n, 10)
             for n in sl.SENSOR_BEARINGS}
-        self.create_service(Trigger, "arm/pick", self._on_pick)
-        self.create_service(Trigger, "arm/deposit", self._on_deposit)
-        self.create_service(Trigger, "arm/stow", self._on_stow)
-        rate = float(self.get_parameter("rate_hz").value)
+        self.create_service(Trigger, 'arm/pick', self._on_pick)
+        self.create_service(Trigger, 'arm/deposit', self._on_deposit)
+        self.create_service(Trigger, 'arm/stow', self._on_stow)
+        rate = float(self.get_parameter('rate_hz').value)
         self.create_timer(1.0 / max(rate, 1.0), self._tick)
-        self.get_logger().info("Sim running with %d litter items" % len(litter))
+        self.get_logger().info('Sim running with %d litter items' % len(litter))
 
     def _now(self):
         return self.get_clock().now().nanoseconds / 1e9
@@ -64,7 +64,7 @@ class SimNode(Node):
         return res
 
     def _on_stow(self, _req, res):
-        res.success, res.message = True, "stowed"
+        res.success, res.message = True, 'stowed'
         return res
 
     # Main loop:
@@ -78,8 +78,8 @@ class SimNode(Node):
 
         odom = Odometry()
         odom.header.stamp = stamp
-        odom.header.frame_id = "odom"
-        odom.child_frame_id = "base_link"
+        odom.header.frame_id = 'odom'
+        odom.child_frame_id = 'base_link'
         odom.pose.pose.position.x = world.x
         odom.pose.pose.position.y = world.y
         odom.pose.pose.orientation.z = math.sin(world.yaw / 2)
@@ -91,7 +91,7 @@ class SimNode(Node):
         for name, dist in world.ranges().items():
             rng = Range()
             rng.header.stamp = stamp
-            rng.header.frame_id = "ultrasonic_" + name
+            rng.header.frame_id = 'ultrasonic_' + name
             rng.radiation_type = Range.ULTRASOUND
             rng.field_of_view = 0.26
             rng.min_range = 0.02
@@ -106,6 +106,7 @@ class SimNode(Node):
 
 
 def main(args=None) -> None:
+    """Run the sim node until interrupted."""
     rclpy.init(args=args)
     node = SimNode()
     try:
@@ -118,5 +119,5 @@ def main(args=None) -> None:
             rclpy.shutdown()
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     main()
