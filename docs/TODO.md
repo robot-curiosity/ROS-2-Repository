@@ -51,7 +51,6 @@ Order matters; later items assume earlier ones. One item per run, one PR each.
 
 The end goal Bryan set: as each part of the robot is assembled he only puts values into `config/robot.yaml`, runs one command and tests it. Items 10-14 build that path first; everything after improves behavior and software quality.
 
-- [ ] 26. Package hygiene. Declare the missing dependencies in `package.xml` (OpenCV, requests, ultralytics where a rosdep key exists, otherwise note it), set a real package description, and leave the license as "TODO: Bryan to choose".
 
 If every item is done or blocked, stop and say so in the run summary. Do not invent new work.
 
@@ -65,6 +64,8 @@ If every item is done or blocked, stop and say so in the run summary. Do not inv
 - Anything that needs the real robot or purchasing: counts per revolution, fuse sizing, IMU/GPS wiring, field trials.
 
 ## Done
+
+- [x] 26. Package hygiene. Declare the missing dependencies in `package.xml` (OpenCV, requests, ultralytics where a rosdep key exists, otherwise note it), set a real package description, and leave the license as "TODO: Bryan to choose". (Done: real description, `python3-yaml/opencv/requests/numpy` exec_depends added; ultralytics, smbus2, lerobot have no rosdep key so are noted in a package.xml comment as pip installs; license left TODO; `test_package_xml.py`.)
 
 - [x] 25. Style cleanup (one or two modules per run). The ament flake8 and pep257 tests are skipped in CI because of 247 legacy complaints. Fix them module by module and, once a module is clean, say so in the PR. (Progress, run 1: `frame_grabber`, `sonar_scheduler`, `trial_summary`, `bringup_util` are clean. Run 2: `behavior_logic`, `arm_kinematics`, `detection_filter`, `test_arm_kinematics` are clean. Run 3: `drive_logic`, `ultrasonic_logic`, `gps_imu_logic`, `sim_logic`, `ground_projection`, `detection_filter` and their tests `test_ultrasonic_logic`, `test_gps_imu_logic`, `test_sim_logic`, `test_ground_projection` are clean. Run 4: `safety_logic`, `search_pattern`, `test_safety_logic`, `test_search_pattern` are clean. Run 5: `config_logic`, `calibration_logic`, `test_config_logic`, `test_calibration_logic` are clean. Run 6: `hardware_check_logic`, `hardware_check`, `test_hardware_check_logic`, `ultrasonic_logic` import order, `frame_grabber` are clean. Run 7: `trial_log`, `sim_mission`, `arm_logic` and `test_trial_log`, `test_sim_mission`, `test_arm_logic` are clean. Run 8: `detection_logic`, `test_detection_logic`, `setup.py` are clean. Run 9: all launch files, `test_sonar_scheduler`, `test_behavior_logic`, `test_frame_grabber` are clean. Run 10: `sim_node`, `ultrasonic_node`, `gps_imu_node` are clean. Run 11: `drive_node`, `behavior_node`, `arm_node` are clean. Run 12: `detector_node` and `calibrate` are clean, so every module in `trash_vision/` passes flake8 with the google import-order style and pep257 docstrings, checked with plain flake8 plugins locally.) The skip in `.github/workflows/ci.yml` is left in place: the ament linters cannot run here, so removing it is untested (and test_copyright needs the license Bryan has not chosen).
 

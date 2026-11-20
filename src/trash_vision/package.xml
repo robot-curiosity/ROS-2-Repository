@@ -3,7 +3,7 @@
 <package format="3">
   <name>trash_vision</name>
   <version>0.0.0</version>
-  <description>TODO: Package description</description>
+  <description>Curiosity autonomous litter-collection robot: YOLOv8 litter detection, sonar, drive, arm, GPS/IMU nodes and a behavior state machine for a Raspberry Pi 5 on ROS 2 Jazzy.</description>
   <maintainer email="root@todo.todo">root</maintainer>
   <license>TODO: License declaration</license>
 
@@ -17,6 +17,14 @@
   <exec_depend>launch_ros</exec_depend>
   <exec_depend>ament_index_python</exec_depend>
   <exec_depend>python3-serial</exec_depend>
+  <exec_depend>python3-yaml</exec_depend>
+  <exec_depend>python3-opencv</exec_depend>
+  <exec_depend>python3-requests</exec_depend>
+  <exec_depend>python3-numpy</exec_depend>
+  <!-- No rosdep keys (checked by name, not verified against the rosdep index):
+       install with pip on the Pi: ultralytics (YOLOv8), smbus2 (IMU),
+       lerobot (SO101 arm). gpiozero and lgpio: apt python3-gpiozero
+       python3-lgpio. TODO: Bryan to confirm these on the robot. -->
 
   <test_depend>ament_copyright</test_depend>
   <test_depend>ament_flake8</test_depend>
