@@ -6,8 +6,8 @@ CLEAR = [math.inf] * 2
 
 
 def tgt(err=0.0, y=0.5, conf=0.9):
-    return {"detected": True, "confidence": conf, "horizontal_error": err,
-            "floor_point_normalized": {"x": 0.5, "y": y}}
+    return {'detected': True, 'confidence': conf, 'horizontal_error': err,
+            'floor_point_normalized': {'x': 0.5, 'y': y}}
 
 
 def test_min_range_handles_inf_and_too_close():
@@ -41,9 +41,9 @@ def test_low_confidence_ignored():
 def test_target_lost_returns_to_search():
     m = bl.BehaviorMachine()
     m.step(0.0, tgt(), CLEAR, CLEAR)
-    m.step(1.0, {"detected": False}, CLEAR, CLEAR)
+    m.step(1.0, {'detected': False}, CLEAR, CLEAR)
     assert m.state == bl.APPROACH
-    m.step(2.0, {"detected": False}, CLEAR, CLEAR)
+    m.step(2.0, {'detected': False}, CLEAR, CLEAR)
     assert m.state == bl.SEARCH
 
 
@@ -67,14 +67,14 @@ def test_full_cycle():
     m = bl.BehaviorMachine()
     m.step(0.0, tgt(), CLEAR, CLEAR)
     c = m.step(0.1, tgt(err=0.0, y=0.95), CLEAR, CLEAR)
-    assert m.state == bl.PICK and c.arm_action == "pick"
+    assert m.state == bl.PICK and c.arm_action == 'pick'
     assert m.step(0.2, None, CLEAR, CLEAR).arm_action is None
     m.arm_result(True, 1.0)
     assert m.state == bl.DEPOSIT
-    assert m.step(1.1, None, CLEAR, CLEAR).arm_action == "deposit"
+    assert m.step(1.1, None, CLEAR, CLEAR).arm_action == 'deposit'
     m.arm_result(True, 2.0)
     assert m.state == bl.STOW and m.items_collected == 1
-    assert m.step(2.1, None, CLEAR, CLEAR).arm_action == "stow"
+    assert m.step(2.1, None, CLEAR, CLEAR).arm_action == 'stow'
     m.arm_result(True, 3.0)
     assert m.state == bl.SEARCH
 
@@ -111,7 +111,7 @@ def test_arm_timeout_counts_as_failure():
 # --- Wedge-proofing: every state must return to SEARCH on its own ---------
 BLOCKED = [0.1] * 2
 # Never reaches the pick zone: target visible but floor y stays small.
-FAR = dict(err=0.0, y=0.3)
+FAR = {'err': 0.0, 'y': 0.3}
 
 
 def _drive_until_search(m, start, end, target, front=CLEAR, rear=CLEAR,
@@ -138,7 +138,7 @@ def test_approach_blocked_by_obstacle_times_out_to_search():
     assert m.state == bl.APPROACH
     t = _drive_until_search(
         m, 0.5, 60.0, lambda: tgt(**FAR), front=BLOCKED)
-    assert t is not None and t <= m.p["approach_timeout"] + 1.0
+    assert t is not None and t <= m.p['approach_timeout'] + 1.0
 
 
 def test_approach_never_reaching_pick_zone_times_out():
@@ -152,7 +152,7 @@ def test_approach_cooldown_ignores_same_target_then_resumes():
     t = _drive_until_search(m, 0.0, 60.0, lambda: tgt(**FAR))
     m.step(t + 0.5, tgt(**FAR), CLEAR, CLEAR)
     assert m.state == bl.SEARCH
-    m.step(t + m.p["approach_cooldown"] + 0.5, tgt(**FAR), CLEAR, CLEAR)
+    m.step(t + m.p['approach_cooldown'] + 0.5, tgt(**FAR), CLEAR, CLEAR)
     assert m.state == bl.APPROACH
 
 
@@ -196,7 +196,7 @@ def test_stale_arm_result_after_timeout_is_ignored():
     m.step(0.1, tgt(y=0.95), CLEAR, CLEAR)
     m.step(100.0, None, CLEAR, CLEAR)  # pick timed out -> SEARCH
     assert m.state == bl.SEARCH
-    m.arm_result(True, 101.0, "pick")  # late reply
+    m.arm_result(True, 101.0, 'pick')  # late reply
     assert m.state == bl.SEARCH and m.items_collected == 0
 
 
@@ -204,7 +204,7 @@ def test_stale_result_for_other_phase_does_not_advance():
     m = bl.BehaviorMachine()
     m.step(0.0, tgt(y=0.95), CLEAR, CLEAR)
     m.step(0.1, tgt(y=0.95), CLEAR, CLEAR)
-    m.arm_result(True, 1.0, "deposit")
+    m.arm_result(True, 1.0, 'deposit')
     assert m.state == bl.PICK
 
 
@@ -242,10 +242,10 @@ def test_search_spin_zero_when_both_sides_close():
 
 
 def test_side_clearance_is_a_parameter():
-    m = bl.BehaviorMachine({"side_clearance": 0.05})
+    m = bl.BehaviorMachine({'side_clearance': 0.05})
     c = m.step(0.0, None, CLEAR, CLEAR, NEAR, NEAR)
     assert c.angular > 0
-    m = bl.BehaviorMachine({"side_clearance": 0.5})
+    m = bl.BehaviorMachine({'side_clearance': 0.5})
     c = m.step(0.0, None, CLEAR, CLEAR, [0.4, 2.0], CLEAR)
     assert c.angular < 0
 
@@ -284,13 +284,13 @@ def test_recover_backs_up_using_rear_not_front():
 
 def test_stale_front_sonar_stops_forward_motion():
     from trash_vision import sonar_scheduler as ss
-    names = ["front_1", "front_2"]
-    ranges = {"front_1": 2.0, "front_2": 2.0}
+    names = ['front_1', 'front_2']
+    ranges = {'front_1': 2.0, 'front_2': 2.0}
 
     def drive(stamps):
         m = bl.BehaviorMachine()
         front = ss.apply_staleness(names, ranges, stamps, 10.0, 2.0)
         return m.step(10.0, tgt(), front, CLEAR)
 
-    assert drive({"front_1": 9.9, "front_2": 9.9}).linear > 0.0
-    assert drive({"front_1": 5.0, "front_2": 9.9}).linear <= 0.0
+    assert drive({'front_1': 9.9, 'front_2': 9.9}).linear > 0.0
+    assert drive({'front_1': 5.0, 'front_2': 9.9}).linear <= 0.0

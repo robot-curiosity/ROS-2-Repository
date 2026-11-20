@@ -15,57 +15,57 @@ def test_take_returns_newest_only_once():
     clock = Clock()
     latest = fg.LatestFrame(clock)
     assert latest.take() is None
-    latest.put("f1")
+    latest.put('f1')
     clock.t = 0.2
     frame, seq, age = latest.take()
-    assert (frame, seq) == ("f1", 1)
+    assert (frame, seq) == ('f1', 1)
     assert abs(age - 0.2) < 1e-9
     assert latest.take() is None
 
 
 def test_old_frames_are_dropped_not_queued():
     latest = fg.LatestFrame(Clock())
-    for name in ("a", "b", "c"):
+    for name in ('a', 'b', 'c'):
         latest.put(name)
     frame, seq, _ = latest.take()
-    assert frame == "c" and seq == 3
+    assert frame == 'c' and seq == 3
     assert latest.dropped == 2
     assert latest.take() is None
 
 
 def test_taken_frame_replaced_is_not_counted_dropped():
     latest = fg.LatestFrame(Clock())
-    latest.put("a")
+    latest.put('a')
     latest.take()
-    latest.put("b")
+    latest.put('b')
     assert latest.dropped == 0
 
 
 def test_run_once_stores_good_frames_and_counts_failures():
-    results = iter([(True, "x"), (False, None), (True, None)])
+    results = iter([(True, 'x'), (False, None), (True, None)])
     grabber = fg.FrameGrabber(lambda: next(results))
     assert grabber.run_once() is True
     assert grabber.run_once() is False
     assert grabber.run_once() is False
     assert grabber.failures == 2
-    assert grabber.latest.take()[0] == "x"
+    assert grabber.latest.take()[0] == 'x'
 
 
 def test_read_exception_is_a_failure_not_a_crash():
     def boom():
-        raise OSError("camera gone")
+        raise OSError('camera gone')
     grabber = fg.FrameGrabber(boom)
     assert grabber.run_once() is False
     assert grabber.failures == 1
 
 
 def test_thread_keeps_newest_frame_while_consumer_is_slow():
-    counter = {"n": 0}
+    counter = {'n': 0}
 
     def read():
-        counter["n"] += 1
+        counter['n'] += 1
         time.sleep(0.001)
-        return True, counter["n"]
+        return True, counter['n']
 
     grabber = fg.FrameGrabber(read)
     grabber.start()
@@ -79,13 +79,13 @@ def test_thread_keeps_newest_frame_while_consumer_is_slow():
 
 
 def test_thread_survives_read_failures():
-    state = {"n": 0}
+    state = {'n': 0}
 
     def read():
-        state["n"] += 1
-        if state["n"] < 3:
+        state['n'] += 1
+        if state['n'] < 3:
             return False, None
-        return True, state["n"]
+        return True, state['n']
 
     grabber = fg.FrameGrabber(read, retry_delay_s=0.001)
     grabber.start()
@@ -125,4 +125,4 @@ def test_timer_period_from_rate_parameter():
     assert abs(fg.timer_period_s(10.0) - 0.1) < 1e-9
     assert abs(fg.timer_period_s(0.0) - 2.0) < 1e-9   # clamped to 0.5 Hz
     assert abs(fg.timer_period_s(1000.0) - 1 / 60.0) < 1e-9
-    assert abs(fg.timer_period_s("bad") - 0.1) < 1e-9
+    assert abs(fg.timer_period_s('bad') - 0.1) < 1e-9
