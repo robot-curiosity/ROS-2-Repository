@@ -1,128 +1,189 @@
-# Imports:
-# JSON:
+"""YOLO litter detector node: camera in, /vision/target and friends out."""
 import json
-
-# Queue:
+import os
 import queue
-
-# Threading:
 import threading
-
-# Time:
 import time
 
-# CV2:
 import cv2
-
-# Requests:
-import requests
-
-# ROS:
 import rclpy
-
-# > Node:
 from rclpy.node import Node
-
-# Standard:
-from std_msgs.msg import String
-
-# Ultralytics:
+import requests
+from std_msgs.msg import Float32, String
 from ultralytics import YOLO
+
+from trash_vision import (
+    detection_filter, detection_logic, frame_grabber, ground_projection)
 
 
 # Detector:
 class TrashDetector(Node):
+    """Detect litter in camera frames and publish the best target."""
+
     # Initialization:
     def __init__(self) -> None:
+        """Declare parameters, load the model and start the workers."""
         # Initialization:
-        super().__init__("trash_detector")
+        super().__init__('trash_detector')
 
         # Parameters:
         self.declare_parameters(
             # Namespace:
-            namespace="",
+            namespace='',
 
             # Parameters:
             parameters=[
                 # Model:
                 (
-                    "model_path",
-                    "/home/christopherg/best_ncnn_model",
+                    'model_path',
+                    '/home/christopherg/best_ncnn_model',
                 ),
 
                 # Camera:
                 (
-                    "camera_source",
-                    "tcp://127.0.0.1:8888",
+                    'camera_source',
+                    'tcp://127.0.0.1:8888',
                 ),
 
                 # Confidence:
-                ("confidence", 0.40),
+                ('confidence', 0.40),
+
+                # Processing rate cap in Hz (frames are always the newest):
+                ('process_rate_hz', 10.0),
 
                 # Deadband:
-                ("deadband", 0.12),
+                ('deadband', 0.12),
 
                 # Mapping:
                 (
-                    "mapping_upload_url",
-                    "http://192.168.0.102:5000/frame",
+                    'mapping_upload_url',
+                    'http://192.168.0.102:5000/frame',
                 ),
 
                 # Mapping:
-                ("mapping_enabled", True),
+                ('mapping_enabled', True),
 
                 # Interval:
-                ("mapping_interval_seconds", 2.0),
+                ('mapping_interval_seconds', 2.0),
 
                 # Quality:
-                ("mapping_jpeg_quality", 80),
+                ('mapping_jpeg_quality', 80),
+
+                # GPT-4o fallback (key is read from OPENAI_API_KEY):
+                ('gpt_fallback_enabled', False),
+                ('gpt_fallback_interval_seconds', 5.0),
+                ('gpt_fallback_low_confidence', 0.30),
+                ('gpt_model', 'gpt-4o'),
+
+                # Camera pose for ground projection (from CAD V16-18 per
+                # STATE.md, not measured; TODO: Bryan to verify):
+                ('camera_x_m', 0.248),
+                ('camera_y_m', -0.1575),
+                ('camera_height_m', 0.642),
+                ('camera_pitch_deg', 35.0),
+                ('camera_hfov_deg', 66.0),
+                ('camera_vfov_deg', 41.0),
+
+                # Detection filtering (item 20):
+                ('confirm_frames', 3),
+                ('confirm_window', 5),
+                ('track_match_radius', 0.10),
+                # Flat x1,y1,x2,y2 groups, normalized 0..1; a zero-area
+                # group means none. TODO: Bryan to measure the bag hoop/arm.
+                ('ignore_regions', [0.0, 0.0, 0.0, 0.0]),
             ],
         )
 
         # Variables (Assignment):
         # Path:
         model_path: str = str(
-            self.get_parameter("model_path").value
+            self.get_parameter('model_path').value
         )
 
         # Camera:
         camera_source: str = str(
-            self.get_parameter("camera_source").value
+            self.get_parameter('camera_source').value
         )
 
         # Confidence:
         self.confidence: float = float(
-            self.get_parameter("confidence").value
+            self.get_parameter('confidence').value
+        )
+
+        # Detection filter:
+        self.detection_filter = detection_filter.DetectionFilter(
+            min_confidence=self.confidence,
+            confirm_frames=int(
+                self.get_parameter('confirm_frames').value),
+            window_frames=int(
+                self.get_parameter('confirm_window').value),
+            match_radius=float(
+                self.get_parameter('track_match_radius').value),
+            ignore_regions=detection_filter.parse_regions(
+                self.get_parameter('ignore_regions').value),
+        )
+
+        # Processing rate:
+        self.process_rate_hz: float = float(
+            self.get_parameter('process_rate_hz').value
         )
 
         # Deadband:
         self.deadband: float = float(
-            self.get_parameter("deadband").value
+            self.get_parameter('deadband').value
         )
 
         # Mapping:
         self.mapping_upload_url: str = str(
-            self.get_parameter("mapping_upload_url").value
+            self.get_parameter('mapping_upload_url').value
         )
 
         # Mapping:
         self.mapping_enabled: bool = bool(
-            self.get_parameter("mapping_enabled").value
+            self.get_parameter('mapping_enabled').value
         )
 
         # Interval:
         self.mapping_interval_seconds: float = float(
             self.get_parameter(
-                "mapping_interval_seconds"
+                'mapping_interval_seconds'
             ).value
         )
 
         # Quality:
         self.mapping_jpeg_quality: int = int(
             self.get_parameter(
-                "mapping_jpeg_quality"
+                'mapping_jpeg_quality'
             ).value
         )
+
+        # GPT fallback:
+        self.gpt_fallback_enabled: bool = bool(
+            self.get_parameter('gpt_fallback_enabled').value
+        )
+        self.gpt_fallback_interval: float = float(
+            self.get_parameter('gpt_fallback_interval_seconds').value
+        )
+        self.gpt_fallback_low_conf: float = float(
+            self.get_parameter('gpt_fallback_low_confidence').value
+        )
+        self.gpt_model: str = str(self.get_parameter('gpt_model').value)
+        self.camera = ground_projection.camera_from_degrees(
+            *(float(self.get_parameter(n).value) for n in (
+                'camera_x_m', 'camera_y_m', 'camera_height_m',
+                'camera_pitch_deg', 'camera_hfov_deg', 'camera_vfov_deg')))
+        self.gpt_last_call_time = -1e9
+        self.gpt_busy = threading.Event()
+        self.gpt_result = None
+        self.gpt_result_time = 0.0
+        self.gpt_lock = threading.Lock()
+        if self.gpt_fallback_enabled and not os.environ.get(
+                'OPENAI_API_KEY'):
+            self.get_logger().warning(
+                'gpt_fallback_enabled but OPENAI_API_KEY is not set; '
+                'fallback disabled'
+            )
+            self.gpt_fallback_enabled = False
 
         # Publisher:
         self.target_publisher = self.create_publisher(
@@ -130,19 +191,24 @@ class TrashDetector(Node):
             String,
 
             # URL:
-            "/vision/target",
+            '/vision/target',
 
             # Frequency:
             10,
         )
 
-        # 
+        # Measured processing rate:
+        self.fps_publisher = self.create_publisher(
+            Float32, '/vision/fps', 10
+        )
+
+        # Direction:
         self.direction_publisher = self.create_publisher(
             # Message:
             String,
 
             # URL:
-            "/vision/direction",
+            '/vision/direction',
 
             # Frequency:
             10,
@@ -150,7 +216,7 @@ class TrashDetector(Node):
 
         # Logging:
         self.get_logger().info(
-            f"Loading YOLO model: {model_path}"
+            f'Loading YOLO model: {model_path}'
         )
 
         # Variables (Assignment):
@@ -159,16 +225,16 @@ class TrashDetector(Node):
 
         # Logger:
         self.get_logger().info(
-            f"Opening camera source: {camera_source}"
+            f'Opening camera source: {camera_source}'
         )
 
-        # Camera:
-        self.camera = cv2.VideoCapture(camera_source)
+        # Camera (self.camera is the ground-projection pose):
+        self.capture = cv2.VideoCapture(camera_source)
 
         # Validation:
-        if not self.camera.isOpened():
+        if not self.capture.isOpened():
             raise RuntimeError(
-                f"Could not open camera source: {camera_source}"
+                f'Could not open camera source: {camera_source}'
             )
 
         # Variables (Assignment):
@@ -196,7 +262,7 @@ class TrashDetector(Node):
             target=self.mapping_upload_worker,
 
             # Name:
-            name="lingbot-frame-uploader",
+            name='lingbot-frame-uploader',
 
             # Daemon:
             daemon=True,
@@ -205,10 +271,17 @@ class TrashDetector(Node):
         # Thread:
         self.mapping_thread.start()
 
+        # Newest-frame reader thread and processing-rate meter:
+        self.grabber = frame_grabber.FrameGrabber(self.capture.read)
+        self.grabber.start()
+        self.rate_meter = frame_grabber.RateMeter(window_s=2.0)
+        self.last_fps_publish = 0.0
+        self.last_frame_seq = 0
+
         # Timer:
         self.timer = self.create_timer(
-            # Frequency:
-            0.001,
+            # Period from process_rate_hz (clamped 0.5..60 Hz):
+            frame_grabber.timer_period_s(self.process_rate_hz),
 
             # Function:
             self.process_frame,
@@ -216,34 +289,34 @@ class TrashDetector(Node):
 
         # Logging:
         self.get_logger().info(
-            "Trash detector node started"
+            'Trash detector node started'
         )
 
         # Mapping:
         if self.mapping_enabled:
             # Logging:
             self.get_logger().info(
-                "LingBot frame uploading enabled: "
-                f"{self.mapping_upload_url}"
+                'LingBot frame uploading enabled: '
+                f'{self.mapping_upload_url}'
             )
         else:
             # Logging:
             self.get_logger().info(
-                "LingBot frame uploading disabled"
+                'LingBot frame uploading disabled'
             )
 
     # Methods:
     def process_frame(self) -> None:
-        # Variables (Assignment):
-        # Success, Frame:
-        success, frame = self.camera.read()
+        """Process the newest camera frame and publish the result."""
+        # Newest frame from the reader thread (None if no new one):
+        taken = self.grabber.latest.take()
 
         # Validation:
-        if not success:
+        if taken is None:
             # Logger:
             self.get_logger().warning(
                 # Message:
-                "Camera frame unavailable",
+                'No new camera frame',
 
                 # Throttle:
                 throttle_duration_sec=2.0,
@@ -253,6 +326,8 @@ class TrashDetector(Node):
             return
 
         # Variables (Assignment):
+        frame = taken[0]
+
         # Frame:
         self.frame_number += 1
 
@@ -283,8 +358,25 @@ class TrashDetector(Node):
         # Boxes:
         boxes = results[0].boxes
 
+        # Fallback:
+        num_boxes = 0 if boxes is None else len(boxes)
+        best_conf = (
+            float(boxes.conf.max()) if num_boxes else None
+        )
+        self.maybe_start_gpt_fallback(frame, num_boxes, best_conf)
+
         # Validation:
-        if boxes is None or len(boxes) == 0:
+        if num_boxes == 0:
+            # GPT result (fresh only):
+            gpt_target = self.take_gpt_target(width, height)
+            if gpt_target is not None:
+                self.publish_target(gpt_target, gpt_target['direction'])
+                self.report_processing_rate(
+                    direction=gpt_target['direction'],
+                    confidence=gpt_target['confidence'],
+                )
+                return
+
             # Publish:
             self.publish_no_target()
 
@@ -294,25 +386,34 @@ class TrashDetector(Node):
             # Logic:
             return
 
-        # Variables (Assignment):
-        # Confidences:
-        confidences = boxes.conf.cpu().numpy()
-
-        # Index:
-        best_index = int(confidences.argmax())
+        # Candidates (all boxes, normalized), filtered over frames:
+        candidates = []
+        all_xyxy = boxes.xyxy.cpu().numpy().tolist()
+        all_conf = boxes.conf.cpu().numpy().tolist()
+        for bx1, by1, bx2, by2, bconf in (
+            (*xyxy, conf) for xyxy, conf in zip(all_xyxy, all_conf)
+        ):
+            floor_pt = ground_projection.floor_point_to_base(
+                (bx1 + bx2) / 2.0 / width, by2 / height, self.camera)
+            distance = (
+                None if floor_pt is None
+                else (floor_pt[0] ** 2 + floor_pt[1] ** 2) ** 0.5
+            )
+            candidates.append(detection_filter.Candidate(
+                bx1 / width, by1 / height, bx2 / width, by2 / height,
+                float(bconf), distance, (bx1, by1, bx2, by2, bconf),
+            ))
+        chosen = self.detection_filter.update(candidates)
+        if chosen is None:
+            self.publish_no_target()
+            self.report_processing_rate()
+            return
 
         # Coordinates:
-        x1, y1, x2, y2 = (
-            boxes.xyxy[best_index]
-            .cpu()
-            .numpy()
-            .tolist()
-        )
+        x1, y1, x2, y2, _ = chosen.payload
 
         # Confidence:
-        confidence: float = float(
-            confidences[best_index]
-        )
+        confidence: float = float(chosen.confidence)
 
         # Calculations:
         center_x_pixels = (x1 + x2) / 2.0
@@ -325,6 +426,8 @@ class TrashDetector(Node):
         floor_y = y2 / height
 
         horizontal_error = center_x - 0.5
+        floor_xy = ground_projection.floor_point_to_base(
+            floor_x, floor_y, self.camera)
 
         # Direction:
         direction = self.get_direction(horizontal_error)
@@ -332,52 +435,56 @@ class TrashDetector(Node):
         # Target:
         target = {
             # Detected:
-            "detected": True,
+            'detected': True,
 
             # Frame:
-            "frame_number": self.frame_number,
+            'frame_number': self.frame_number,
 
             # Confidence:
-            "confidence": round(confidence, 4),
+            'confidence': round(confidence, 4),
 
             # Pixels:
-            "bbox_pixels": {
+            'bbox_pixels': {
                 # X1:
-                "x1": round(x1, 1),
+                'x1': round(x1, 1),
 
                 # Y1:
-                "y1": round(y1, 1),
+                'y1': round(y1, 1),
 
                 # X2:
-                "x2": round(x2, 1),
+                'x2': round(x2, 1),
 
                 # Y2:
-                "y2": round(y2, 1),
+                'y2': round(y2, 1),
             },
 
             # Center:
-            "center_normalized": {
+            'center_normalized': {
                 # X:
-                "x": round(center_x, 4),
+                'x': round(center_x, 4),
 
                 # Y:
-                "y": round(center_y, 4),
+                'y': round(center_y, 4),
             },
 
             # FLoor:
-            "floor_point_normalized": {
+            'floor_point_normalized': {
                 # X:
-                "x": round(floor_x, 4),
+                'x': round(floor_x, 4),
 
                 # Y:
-                "y": round(floor_y, 4),
+                'y': round(floor_y, 4),
             },
 
             # Error:
-            "horizontal_error": round(horizontal_error, 4),
+            'horizontal_error': round(horizontal_error, 4),
 
             # Direction:
-            "direction": direction,
+            'direction': direction,
+
+            # Floor point in base_link metres (None above the horizon):
+            'base_x': None if floor_xy is None else round(floor_xy[0], 4),
+            'base_y': None if floor_xy is None else round(floor_xy[1], 4),
         }
 
         # Target:
@@ -393,19 +500,74 @@ class TrashDetector(Node):
         )
 
     def get_direction(self, horizontal_error: float) -> str:
-        # Left:
-        if horizontal_error < -self.deadband:
-            return "LEFT"
+        """Map a horizontal error to a direction word."""
+        return detection_logic.get_direction(
+            horizontal_error, self.deadband
+        )
 
-        # Right:
-        if horizontal_error > self.deadband:
-            return "RIGHT"
+    def maybe_start_gpt_fallback(self, frame, num_boxes, best_conf) -> None:
+        """Start the GPT fallback thread when YOLO is unsure."""
+        now = time.monotonic()
+        if self.gpt_busy.is_set():
+            return
+        if not detection_logic.should_use_fallback(
+                num_boxes, best_conf, now, self.gpt_last_call_time,
+                self.gpt_fallback_enabled, self.gpt_fallback_interval,
+                self.gpt_fallback_low_conf):
+            return
+        ok, jpeg = cv2.imencode('.jpg', frame)
+        if not ok:
+            return
+        self.gpt_last_call_time = now
+        self.gpt_busy.set()
+        threading.Thread(
+            target=self.gpt_worker, args=(jpeg.tobytes(),), daemon=True
+        ).start()
 
-        # Center:
-        return "CENTER"
+    def gpt_worker(self, jpeg_bytes: bytes) -> None:
+        """Ask the GPT fallback about one frame (runs in a thread)."""
+        try:
+            payload = detection_logic.build_gpt_payload(
+                detection_logic.encode_jpeg_base64(jpeg_bytes),
+                self.gpt_model,
+            )
+            response = requests.post(
+                'https://api.openai.com/v1/chat/completions',
+                headers={
+                    'Authorization':
+                        'Bearer ' + os.environ['OPENAI_API_KEY']},
+                json=payload,
+                timeout=20,
+            )
+            response.raise_for_status()
+            text = response.json()['choices'][0]['message']['content']
+            box = detection_logic.parse_gpt_response(text)
+            with self.gpt_lock:
+                self.gpt_result = box
+                self.gpt_result_time = time.monotonic()
+        except Exception as error:
+            self.get_logger().warning(f'GPT fallback failed: {error}')
+        finally:
+            self.gpt_busy.clear()
 
+    def take_gpt_target(self, width: int, height: int):
+        """Return a recent GPT target scaled to the frame, or None."""
+        # A GPT answer is only trusted for a short time after it arrives.
+        with self.gpt_lock:
+            box = self.gpt_result
+            age = time.monotonic() - self.gpt_result_time
+        if box is None or age > 2 * self.gpt_fallback_interval:
+            return None
+        return detection_logic.build_target(
+            box['x1'] * width, box['y1'] * height,
+            box['x2'] * width, box['y2'] * height,
+            width, height, box['confidence'],
+            self.frame_number, self.deadband, source='gpt4o',
+            camera=self.camera,
+        )
 
     def publish_target(self, target: dict, direction: str) -> None:
+        """Publish a detected target as JSON on /vision/target."""
         # Variables (Assignment):
         # Message:
         target_message = String()
@@ -426,6 +588,7 @@ class TrashDetector(Node):
         self.direction_publisher.publish(direction_message)
 
     def publish_no_target(self) -> None:
+        """Publish a no-target message."""
         # Variables (Assignment);
         # Message:
         target_message = String()
@@ -434,10 +597,10 @@ class TrashDetector(Node):
         target_message.data = json.dumps(
             {
                 # Detected:
-                "detected": False,
+                'detected': False,
 
                 # Frame:
-                "frame_number": self.frame_number,
+                'frame_number': self.frame_number,
             }
         )
 
@@ -448,7 +611,7 @@ class TrashDetector(Node):
         direction_message = String()
 
         # > Data:
-        direction_message.data = "NO_TARGET"
+        direction_message.data = 'NO_TARGET'
 
         # Publish:
         self.direction_publisher.publish(direction_message)
@@ -462,13 +625,22 @@ class TrashDetector(Node):
         # Confidence:
         confidence: float | None = None,
     ) -> None:
-        # Validation:
-        if self.fps_frame_count < 30:
-            return
-
+        """Log the processing rate and current target."""
         # Variables (Assignment):
         # Time:
         current_time = time.monotonic()
+
+        # Measured rate over a sliding window, published about once a second:
+        self.rate_meter.tick(current_time)
+        if current_time - self.last_fps_publish >= 1.0:
+            self.last_fps_publish = current_time
+            fps_message = Float32()
+            fps_message.data = float(self.rate_meter.rate(current_time))
+            self.fps_publisher.publish(fps_message)
+
+        # Validation:
+        if self.fps_frame_count < 30:
+            return
 
         # Elapsed:
         elapsed_time = (
@@ -486,19 +658,19 @@ class TrashDetector(Node):
 
         # Message:
         message = (
-            f"processing_rate={processing_rate:.1f} FPS"
+            f'processing_rate={processing_rate:.1f} FPS'
         )
 
         # Direction:
         if direction is not None:
             # Message:
-            message += f" target={direction}"
+            message += f' target={direction}'
 
         # Confidence:
         if confidence is not None:
             # Message:
             message += (
-                f" confidence={confidence:.2f}"
+                f' confidence={confidence:.2f}'
             )
 
         # Logging:
@@ -511,6 +683,7 @@ class TrashDetector(Node):
         self.fps_start_time = current_time
 
     def queue_mapping_frame(self, frame) -> None:
+        """Queue a frame for mapping upload."""
         # Validation:
         if not self.mapping_enabled:
             return
@@ -573,16 +746,17 @@ class TrashDetector(Node):
             # Logging:
             self.get_logger().warning(
                 # Mapping Queue:
-                "Mapping queue remained full; "
+                'Mapping queue remained full; '
 
                 # Frame:
-                "dropping frame",
+                'dropping frame',
 
                 # Throttle:
                 throttle_duration_sec=5.0,
             )
 
     def mapping_upload_worker(self) -> None:
+        """Upload queued mapping frames (runs in a thread)."""
         # Variables (Assignment):
         # Session:
         session = requests.Session()
@@ -609,7 +783,7 @@ class TrashDetector(Node):
                 encode_success, encoded_frame = (
                     cv2.imencode(
                         # Format:
-                        ".jpg",
+                        '.jpg',
 
                         # Frame:
                         frame,
@@ -627,7 +801,7 @@ class TrashDetector(Node):
                 if not encode_success:
                     # Logging:
                     self.get_logger().warning(
-                        "Could not encode mapping frame"
+                        'Could not encode mapping frame'
                     )
 
                     # Logic:
@@ -640,8 +814,8 @@ class TrashDetector(Node):
 
                 # Filename:
                 filename: str = (
-                    f"frame_{timestamp_ms}_"
-                    f"{frame_number:08d}.jpg"
+                    f'frame_{timestamp_ms}_'
+                    f'{frame_number:08d}.jpg'
                 )
 
                 # Response:
@@ -652,7 +826,7 @@ class TrashDetector(Node):
                     # Files:
                     files={
                         # Frame:
-                        "frame": (
+                        'frame': (
                             # File:
                             filename,
 
@@ -660,22 +834,22 @@ class TrashDetector(Node):
                             encoded_frame.tobytes(),
 
                             # Format:
-                            "image/jpeg",
+                            'image/jpeg',
                         )
                     },
 
                     # Data:
                     data={
                         # Filename:
-                        "filename": filename,
+                        'filename': filename,
 
                         # Number:
-                        "frame_number": str(
+                        'frame_number': str(
                             frame_number
                         ),
 
                         # Timestamp:
-                        "timestamp": str(timestamp),
+                        'timestamp': str(timestamp),
                     },
 
                     # Timeout:
@@ -687,23 +861,23 @@ class TrashDetector(Node):
 
                 # Logger:
                 self.get_logger().info(
-                    f"Uploaded mapping frame: "
-                    f"{filename}"
+                    f'Uploaded mapping frame: '
+                    f'{filename}'
                 )
 
             except requests.RequestException as error:
                 # LOgging:
                 self.get_logger().warning(
-                    "Mapping upload failed: "
-                    f"{error}",
+                    'Mapping upload failed: '
+                    f'{error}',
                     throttle_duration_sec=5.0,
                 )
 
             except Exception as error:
                 # Logging:
                 self.get_logger().error(
-                    "Unexpected mapping uploader "
-                    f"error: {error}"
+                    'Unexpected mapping uploader '
+                    f'error: {error}'
                 )
 
             finally:
@@ -714,9 +888,10 @@ class TrashDetector(Node):
         session.close()
 
     def destroy_node(self) -> None:
+        """Stop workers and destroy the node."""
         # Logger:
         self.get_logger().info(
-            "Shutting down trash detector"
+            'Shutting down trash detector'
         )
 
         # Mapping:
@@ -729,21 +904,22 @@ class TrashDetector(Node):
             )
 
         # Camera:
-        if self.camera.isOpened():
-            self.camera.release()
+        self.grabber.stop()
+        if self.capture.isOpened():
+            self.capture.release()
 
         # Node:
         super().destroy_node()
 
 
 def main(arguments=None) -> None:
+    """Run the detector node."""
     # Initialization:
     rclpy.init(args=arguments)
 
     # Variables (Assignment):
     # Node:
     node = None
-
 
     # Logic:
     try:
@@ -759,11 +935,11 @@ def main(arguments=None) -> None:
         # Validation:
         if node is not None:
             node.get_logger().fatal(
-                f"Fatal node error: {error}"
+                f'Fatal node error: {error}'
             )
         else:
             print(
-                f"Failed to initialize node: {error}"
+                f'Failed to initialize node: {error}'
             )
 
         raise
@@ -778,5 +954,5 @@ def main(arguments=None) -> None:
 
 
 # Node:
-if __name__ == "__main__":
+if __name__ == '__main__':
     main()
