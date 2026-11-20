@@ -15,24 +15,24 @@ from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
 from launch_ros.parameter_descriptions import ParameterValue
 
-NODES = ["drive", "ultrasonic", "detector", "arm", "gps_imu"]
+NODES = ['drive', 'ultrasonic', 'detector', 'arm', 'gps_imu']
 
 
 def generate_launch_description():
-    share = get_package_share_directory("trash_vision")
-    params = os.path.join(share, "config", "robot.yaml")
-    actions = [DeclareLaunchArgument("use_" + n, default_value="true")
+    share = get_package_share_directory('trash_vision')
+    params = os.path.join(share, 'config', 'robot.yaml')
+    actions = [DeclareLaunchArgument('use_' + n, default_value='true')
                for n in NODES]
     actions.append(DeclareLaunchArgument(
-        "enable_behavior", default_value="false"))
+        'enable_behavior', default_value='false'))
     for n in NODES:
         actions.append(Node(
-            package="trash_vision", executable=n, name=n, output="screen",
+            package='trash_vision', executable=n, name=n, output='screen',
             parameters=[params],
-            condition=IfCondition(LaunchConfiguration("use_" + n))))
+            condition=IfCondition(LaunchConfiguration('use_' + n))))
     actions.append(Node(
-        package="trash_vision", executable="behavior", name="behavior",
-        output="screen",
-        parameters=[params, {"enabled": ParameterValue(
-            LaunchConfiguration("enable_behavior"), value_type=bool)}]))
+        package='trash_vision', executable='behavior', name='behavior',
+        output='screen',
+        parameters=[params, {'enabled': ParameterValue(
+            LaunchConfiguration('enable_behavior'), value_type=bool)}]))
     return LaunchDescription(actions)

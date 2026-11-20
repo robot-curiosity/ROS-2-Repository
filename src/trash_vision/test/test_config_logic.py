@@ -175,7 +175,7 @@ def test_each_subsystem_has_a_launch_file():
         path = os.path.join(launch, 'bringup_%s.launch.py' % sub)
         assert os.path.exists(path), path
         with open(path) as f:
-            assert 'subsystem_launch("%s")' % sub in f.read()
+            assert "subsystem_launch('%s')" % sub in f.read()
         for n in nodes:
             assert n in NODE_FILES
     assert os.path.exists(os.path.join(launch, 'bringup.launch.py'))
