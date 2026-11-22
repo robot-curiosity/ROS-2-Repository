@@ -51,12 +51,18 @@ Order matters; later items assume earlier ones. One item per run, one PR each.
 
 The end goal Bryan set: as each part of the robot is assembled he only puts values into `config/robot.yaml`, runs one command and tests it. Items 10-14 build that path first; everything after improves behavior and software quality.
 
+- [ ] 27. Pico wheel-loop option (Bryan asked for this on Nov 22; it is an OPTION, not a switch). Write firmware for the Raspberry Pi Pico (MicroPython, `firmware/pico_wheels/`) that runs the 4-wheel closed-loop speed control: reads encoders, drives the two MDD10A channels, PID per side, stops if no command arrives for a timeout. Keep the PID, ramp and protocol code in plain Python modules that run on a PC and are unit-tested in CI (a fake serial loopback tests the protocol). Define a small line-based serial protocol (velocity targets in, ticks and measured speed out, error and watchdog flags) and document it. Add a `pico_bridge` ROS node with the same interface as the drive node (`/cmd_vel` in, odometry out) and a launch argument `wheel_backend:=pi|pico` (default `pi`, unchanged). All Pico pins and the serial port are parameters marked "TODO: Bryan to fill in". Do not remove or modify the Pi drive node. Add a DECISIONS.md row with the pros and cons of each backend marked "option, not selected", and hardware-test rows for the Pico.
+- [ ] 28. Sim with arm and noise. Extend `sim_logic.py` so a pick only succeeds if the litter is in the pick zone and `arm_kinematics.py` finds a solution, with a grasp success probability parameter, camera detection dropouts and false positives, and sonar noise and dropouts. Seeded randomness so CI is repeatable. The sim test prints the pickup rate by litter type and asserts a minimum for the default parameters.
+- [ ] 29. Fault-injection tests. Pure-Python tests that inject faults into the behavior and safety logic: sonar dropout, detector going silent, arm service timeout, repeated pick failure, serial/odometry loss, and assert the robot stops or recovers as designed. Fix any wedge you find.
+- [ ] 30. Progress summary tool. `tools/status.py` prints, from the repo only: hardware test rows done, pass, fail and not yet run (parsed from `docs/HARDWARE_TESTS.md`), unset values in `robot.yaml`, and trial pickup rate if a trial log is given. Output short plain text so Bryan can run it before a session.
+- [ ] 31. Trial plan. `docs/TRIAL_PLAN.md` for the Dec 30 to Jan 12 trials: litter types and counts, placement layouts, surfaces, number of runs per condition, what to record per run (matching the trial log fields), how to run the summary, and a table to fill in. Mark the research question and success criterion as "TODO: Bryan to fill in"; use the 80 percent pickup target from the project notes as a labeled default.
+- [ ] 32. Pi setup README. A top-level `README.md` quick start: install ROS 2 Jazzy and the Python dependencies on the Pi, clone, `colcon build`, source, run `hardware_check`, and where to find BRINGUP.md and the calibration tools. Exact commands only.
 
 If every item is done or blocked, stop and say so in the run summary. Do not invent new work.
 
 ## Blocked on Bryan's decisions (do NOT work on these)
 
-- Wheel control loop on the Pi or on a Pico (the existing drive node stays as it is; do not extend it. The ultrasonic node is changed only as item 10 and 11 say).
+- Choosing the wheel control loop on the Pi or on a Pico (the existing drive node stays as it is and stays the default; do not extend it. Item 27 only adds the Pico as an option behind a launch argument. The ultrasonic node is changed only as item 10 and 11 say).
 - Arm interface: LeRobot wrapper or `ros2_control`.
 - Detector message type (stay with JSON in `std_msgs/String` for now).
 - Cloud vision (GPT-4o) stays off and is not to be extended until on-device pickup works (see `DECISIONS.md` on `docs/consolidated-state`).
