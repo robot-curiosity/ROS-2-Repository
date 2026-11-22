@@ -14,6 +14,7 @@ from trash_vision import safety_logic as sfl
 PKG = os.path.join(os.path.dirname(__file__), '..')
 NODE_FILES = {
     'drive': 'drive_node.py',
+    'pico_bridge': 'pico_bridge_node.py',
     'ultrasonic': 'ultrasonic_node.py',
     'arm': 'arm_node.py',
     'gps_imu': 'gps_imu_node.py',
