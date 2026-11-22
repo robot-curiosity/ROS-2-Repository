@@ -26,6 +26,32 @@ drive:
     update_rate_hz: 50.0      # control loop rate
     odom_frame: "odom"
     base_frame: "base_link"
+# OPTION, not the default: wheel speed loop on a Raspberry Pi Pico instead of the
+# Pi drive node. Use it with `wheel_backend:=pico` (bringup.launch.py or
+# bringup_drive.launch.py); the `drive:` section above is then not used.
+pico_bridge:
+  ros__parameters:
+    serial_port: ""           # serial port of the Pico, e.g. /dev/ttyACM1 (ls /dev/ttyACM*). TODO: Bryan to fill in
+    serial_baud: 115200       # baud rate (USB serial ignores it)
+    pico_pins: [-1, -1, -1, -1, -1, -1, -1, -1]  # Pico GPIO numbers: pwm_left, pwm_right, dir_left, dir_right, enc_a_left, enc_b_left, enc_a_right, enc_b_right. TODO: Bryan to fill in
+    ticks_per_rev: 0.0        # encoder counts per WHEEL rev (after gearbox, x4); same measurement as drive.ticks_per_rev
+    wheel_radius_m: 0.0       # metres; wheel diameter / 2 (CAD: 0.060, not measured)
+    track_width_m: 0.0        # metres between left and right wheel contact patches (CAD: 0.481, not measured)
+    max_wheel_speed_mps: 0.5  # m/s top wheel speed
+    max_accel_mps2: 1.0       # m/s^2 acceleration limit
+    min_duty: 0.0             # 0..1 PWM duty needed to just start the wheel turning
+    kp: 0.5                   # speed PI controller proportional gain
+    ki: 1.0                   # speed PI controller integral gain
+    invert_left: false        # true if the left wheel spins backwards for +x
+    invert_right: false       # true if the right wheel spins backwards for +x
+    invert_enc_left: false    # true if odom x decreases when the left wheel rolls forward
+    invert_enc_right: false   # true if odom x decreases when the right wheel rolls forward
+    cmd_timeout_s: 0.5        # seconds without cmd_vel before the bridge commands zero speed
+    pico_cmd_timeout_s: 0.5   # seconds without a command line before the Pico itself stops the wheels (watchdog)
+    send_rate_hz: 20.0        # how often the bridge sends the velocity command to the Pico
+    link_timeout_s: 1.0       # seconds without any Pico data before a warning is logged
+    odom_frame: "odom"
+    base_frame: "base_link"
 ultrasonic:
   ros__parameters:
     # Order: front_1, front_2, rear_1, rear_2, left_1, left_2, right_1, right_2

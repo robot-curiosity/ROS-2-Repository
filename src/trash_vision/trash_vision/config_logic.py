@@ -19,6 +19,9 @@ REQUIRED = {
     'drive': [
         'pwm_pins', 'dir_pins', 'enc_a_pins', 'enc_b_pins',
         'ticks_per_rev', 'wheel_radius_m', 'track_width_m'],
+    'pico_bridge': [
+        'serial_port', 'pico_pins', 'ticks_per_rev', 'wheel_radius_m',
+        'track_width_m'],
     'ultrasonic': ['trig_pins', 'echo_pins'],
     'arm': ['port'],
     'gps_imu': ['gps_port', 'imu_model'],

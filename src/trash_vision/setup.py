@@ -32,6 +32,7 @@ setup(
             'detector = trash_vision.detector_node:main',
             'ultrasonic = trash_vision.ultrasonic_node:main',
             'drive = trash_vision.drive_node:main',
+            'pico_bridge = trash_vision.pico_bridge_node:main',
             'arm = trash_vision.arm_node:main',
             'gps_imu = trash_vision.gps_imu_node:main',
             'behavior = trash_vision.behavior_node:main',
