@@ -43,3 +43,4 @@
 - 2026-11-22: item 28 (sim noise + arm model): pytest 288 passed locally with PYTHONPATH set (ament linter tests ignored); 9 new tests in test_sim_noise_arm.py; flake8 clean on touched files. Sim only, nothing run on the robot.
 - 2026-11-22: item 29 (fault-injection tests): pytest 309 passed locally with PYTHONPATH set (ament linter tests ignored); 22 new tests in test_fault_injection.py; flake8 clean on touched files. Sim/pure logic only, nothing run on the robot.
 - 2026-11-23: item 30 (status tool): pytest 315 passed locally with PYTHONPATH set (ament linter tests ignored); 6 new tests in test_status_logic.py incl. running tools/status.py on the repo; errors-only flake8 clean. Pure logic, nothing run on the robot.
+- 2026-11-23: item 31 (trial plan doc): 3 new tests in test_trial_plan_doc.py (doc matches trial log fields, TODO markers, commands exist); pytest 318 passed locally (ament linter tests ignored). Docs only, nothing run on the robot.
