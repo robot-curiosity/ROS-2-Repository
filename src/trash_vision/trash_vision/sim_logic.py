@@ -1,6 +1,9 @@
 """Pure-Python 2D kinematic world used by the sim node (no ROS needed)."""
+from dataclasses import dataclass, field
 import math
+import random
 
+from trash_vision import arm_logic as al
 from trash_vision import detection_logic as dl
 
 # Sensor mounting (sim only, NOT real hardware facts; layout per TODO.md,
@@ -23,6 +26,36 @@ FLOOR_K = 0.1225          # floor row y = 0.5 + FLOOR_K / distance (sim only)
 PICK_REACH = 0.40         # m, litter closer than this and in front is pickable
 
 
+DEFAULT_LITTER_TYPE = 'can'
+
+
+def _default_grasp_prob():
+    # Sim-only guesses, NOT measured on the real gripper.
+    return {'can': 0.9, 'bottle': 0.85, 'wrapper': 0.7}
+
+
+@dataclass(frozen=True)
+class SimNoise:
+    """Seeded randomness for the sim. All values are sim assumptions.
+
+    None of these are measured on the real robot; they only make the sim
+    harder than the ideal one. The same seed gives the same run.
+    """
+
+    seed: int = 0
+    grasp_prob: dict = field(default_factory=_default_grasp_prob)
+    default_grasp_prob: float = 0.8   # litter type not in grasp_prob
+    detect_dropout_prob: float = 0.10   # per frame, real target missed
+    false_positive_prob: float = 0.01   # per frame, phantom target
+    sonar_sigma: float = 0.01   # m, gaussian noise on a reading
+    sonar_dropout_prob: float = 0.02   # per reading, no echo (inf)
+
+
+def litter_type(item):
+    """Litter type of an item tuple (x, y[, type])."""
+    return item[2] if len(item) > 2 else DEFAULT_LITTER_TYPE
+
+
 def wrap(angle):
     """Wrap an angle to [-pi, pi]."""
     return math.atan2(math.sin(angle), math.cos(angle))
@@ -32,13 +65,25 @@ class SimWorld:
     """Robot in a walled rectangle [0, width] x [0, height] with litter."""
 
     def __init__(self, width=4.0, height=4.0, litter=None,
-                 x=2.0, y=2.0, yaw=0.0):
+                 x=2.0, y=2.0, yaw=0.0, noise=None, arm=None):
+        """Create a world.
+
+        noise: a SimNoise, or None for the ideal sensors and grasps.
+        arm: an arm_logic.PickConfig; when given, a pick only works if the
+        litter is in the pick zone and arm IK finds a solution.
+        """
         self.width = float(width)
         self.height = float(height)
         self.litter = [tuple(p) for p in (litter or [])]
         self.x, self.y, self.yaw = float(x), float(y), float(yaw)
         self.held = False
+        self.held_type = None
         self.collected = 0
+        self.collected_by_type = {}
+        self.grasp_stats = {}   # type -> [grasp attempts in zone, successes]
+        self.noise = noise
+        self.arm = arm
+        self._rng = random.Random(noise.seed if noise else 0)
 
     def step(self, v, w, dt):
         """Integrate unicycle motion; walls stop the robot."""
@@ -70,9 +115,24 @@ class SimWorld:
         return best if best <= SENSOR_MAX_RANGE else float('inf')
 
     def ranges(self):
-        """Return a dict of sensor name -> distance in metres (inf = nothing seen)."""
-        return {n: self.range_at(b, f, lf)
-                for n, (f, lf, b) in SENSOR_MOUNT.items()}
+        """Return a dict of sensor name -> distance in metres (inf = nothing seen).
+
+        With noise set, readings get gaussian noise and random dropouts.
+        """
+        out = {}
+        for n, (f, lf, b) in SENSOR_MOUNT.items():
+            out[n] = self._noisy_range(self.range_at(b, f, lf))
+        return out
+
+    def _noisy_range(self, value):
+        nz = self.noise
+        if nz is None:
+            return value
+        if self._rng.random() < nz.sonar_dropout_prob:
+            return float('inf')
+        if value == float('inf'):
+            return value
+        return max(0.02, value + self._rng.gauss(0.0, nz.sonar_sigma))
 
     def _polar(self, item):
         dx, dy = item[0] - self.x, item[1] - self.y
@@ -91,6 +151,13 @@ class SimWorld:
     def target(self, frame_number, deadband=0.1):
         """Target dict in the /vision/target format."""
         seen = self.nearest_visible()
+        nz = self.noise
+        if nz is not None:
+            if seen is not None and self._rng.random() < nz.detect_dropout_prob:
+                seen = None
+            if seen is None and self._rng.random() < nz.false_positive_prob:
+                seen = (self._rng.uniform(0.5, CAMERA_MAX_DIST),
+                        self._rng.uniform(-CAMERA_FOV / 2, CAMERA_FOV / 2))
         if seen is None:
             return dl.build_no_target(frame_number)
         d, b = seen
@@ -107,14 +174,36 @@ class SimWorld:
         if self.held:
             return False, 'already holding'
         seen = self.nearest_visible()
-        if seen is None or seen[0] > PICK_REACH:
+        if seen is None:
             return False, 'nothing in reach'
-        for item in list(self.litter):
-            d, b = self._polar(item)
+        if self.arm is None and seen[0] > PICK_REACH:
+            return False, 'nothing in reach'
+        item = None
+        for cand in self.litter:
+            d, b = self._polar(cand)
             if abs(d - seen[0]) < 1e-9 and abs(b - seen[1]) < 1e-9:
-                self.litter.remove(item)
+                item = cand
                 break
+        if item is None:
+            return False, 'nothing in reach'
+        if self.arm is not None:
+            d, b = seen
+            poses, reason = al.plan_pick_poses(
+                d * math.cos(b), d * math.sin(b), self.arm)
+            if poses is None:
+                return False, reason
+        if self.noise is not None:
+            nz = self.noise
+            prob = nz.grasp_prob.get(litter_type(item),
+                                     nz.default_grasp_prob)
+            stat = self.grasp_stats.setdefault(litter_type(item), [0, 0])
+            stat[0] += 1
+            if self._rng.random() >= prob:
+                return False, 'grasp failed'
+            stat[1] += 1
+        self.litter.remove(item)
         self.held = True
+        self.held_type = litter_type(item)
         return True, 'item held'
 
     def deposit(self):
@@ -123,4 +212,7 @@ class SimWorld:
             return False, 'nothing held'
         self.held = False
         self.collected += 1
+        kind = self.held_type or DEFAULT_LITTER_TYPE
+        self.collected_by_type[kind] = self.collected_by_type.get(kind, 0) + 1
+        self.held_type = None
         return True, 'deposited'
