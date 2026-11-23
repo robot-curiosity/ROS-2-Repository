@@ -16,6 +16,11 @@ ARM_DURATION = {'pick': 2.0, 'deposit': 1.5, 'stow': 1.0}
 OPEN_LITTER = [(1.0, 1.0), (3.0, 2.5), (1.5, 3.2), (2.8, 1.2),
                (2.0, 3.0), (1.2, 2.2), (3.0, 3.2), (2.5, 0.9)]
 WALL_LITTER = [(0.3, 2.0), (3.7, 1.5), (2.0, 0.3), (1.0, 3.7)]
+# Mixed litter types for the noisy, arm-limited scenario (types are sim labels).
+TYPED_LITTER = [(x, y, t) for (x, y), t in zip(
+    OPEN_LITTER + WALL_LITTER,
+    ['can', 'bottle', 'wrapper', 'can', 'bottle', 'wrapper',
+     'can', 'bottle', 'wrapper', 'can', 'bottle', 'wrapper'])]
 # Hard case: corners and 0.2 m from a wall. Known weak spot (the front
 # stop distance blocks the approach), tracked as a baseline, not a goal.
 CORNER_LITTER = [(0.15, 0.15), (3.85, 3.85), (0.2, 3.0), (3.8, 0.8)]
@@ -45,15 +50,49 @@ def run_search_only(duration=300.0, **kwargs):
     return run_mission([], duration=duration, search_only=True, **kwargs)
 
 
+# With the arm model on, the robot must stop where IK can reach. With the
+# placeholder arm mount the reachable band is about 0.35-0.43 m straight
+# ahead (narrower off-centre), so aim for 0.38 m. This is what
+# calibrate_pick_zone does on the real robot; sim only, not measured.
+ARM_PICK_DISTANCE = 0.38
+ARM_PICK_PARAMS = {
+    'pick_floor_y': 0.5 + sl.FLOOR_K / ARM_PICK_DISTANCE,
+    'pick_center_tolerance': 0.08,
+}
+
+
+def type_counts(litter):
+    """Count litter items per type (items are (x, y[, type]))."""
+    out = {}
+    for item in litter:
+        kind = sl.litter_type(item)
+        out[kind] = out.get(kind, 0) + 1
+    return out
+
+
+def pickup_rate_by_type(result):
+    """Return {type: collected / total} from a run_mission result."""
+    return {k: result['collected_by_type'].get(k, 0) / n
+            for k, n in result['total_by_type'].items()}
+
+
 def run_mission(litter, duration=600.0, dt=0.05, width=4.0, height=4.0,
-                params=None, recorder_sink=None, search_only=False):
+                params=None, recorder_sink=None, search_only=False,
+                noise=None, arm=None):
     """Simulate one mission; return a dict of results.
 
     Keys: total, collected, fraction, duration, states (visit counts),
     coverage (fraction of the search area the camera swept).
+    Also total_by_type and collected_by_type (litter type -> count).
+    noise is a sim_logic.SimNoise (seeded) or None; arm is an
+    arm_logic.PickConfig or None (see SimWorld).
     The odometry pose is the world pose relative to the start (centre).
     """
-    world = sl.SimWorld(width, height, litter, x=width / 2, y=height / 2)
+    if arm is not None:
+        params = dict(ARM_PICK_PARAMS, **(params or {}))
+    world = sl.SimWorld(width, height, litter, x=width / 2, y=height / 2,
+                        noise=noise, arm=arm)
+    total_by_type = type_counts(world.litter)
     machine = bl.BehaviorMachine(params)
     recorder = (tl.TrialRecorder(machine, recorder_sink, 'sim')
                 if recorder_sink else None)
@@ -104,4 +143,7 @@ def run_mission(litter, duration=600.0, dt=0.05, width=4.0, height=4.0,
     return {'total': total, 'collected': collected,
             'fraction': collected / total if total else 1.0,
             'duration': now, 'states': visits,
-            'coverage': coverage.fraction()}
+            'coverage': coverage.fraction(),
+            'total_by_type': total_by_type,
+            'collected_by_type': dict(world.collected_by_type),
+            'grasp_stats': {k: list(v) for k, v in world.grasp_stats.items()}}
