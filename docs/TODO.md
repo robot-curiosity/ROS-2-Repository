@@ -51,7 +51,6 @@ Order matters; later items assume earlier ones. One item per run, one PR each.
 
 The end goal Bryan set: as each part of the robot is assembled he only puts values into `config/robot.yaml`, runs one command and tests it. Items 10-14 build that path first; everything after improves behavior and software quality.
 
-- [ ] 32. Pi setup README. A top-level `README.md` quick start: install ROS 2 Jazzy and the Python dependencies on the Pi, clone, `colcon build`, source, run `hardware_check`, and where to find BRINGUP.md and the calibration tools. Exact commands only.
 
 If every item is done or blocked, stop and say so in the run summary. Do not invent new work.
 
@@ -65,6 +64,8 @@ If every item is done or blocked, stop and say so in the run summary. Do not inv
 - Anything that needs the real robot or purchasing: counts per revolution, fuse sizing, IMU/GPS wiring, field trials.
 
 ## Done
+
+- [x] 32. Pi setup README. A top-level `README.md` quick start: install ROS 2 Jazzy and the Python dependencies on the Pi, clone, `colcon build`, source, run `hardware_check`, and where to find BRINGUP.md and the calibration tools. Exact commands only. (Done: top-level `README.md` with exact Pi install, build, `hardware_check` and sim commands plus a map of docs, launch files and calibration tools; `test_readme.py` checks every launch file, `ros2 run` script and doc path it names exists. Install commands not run on a fresh Pi, see HARDWARE_TESTS.)
 
 - [x] 31. Trial plan. `docs/TRIAL_PLAN.md` for the Dec 30 to Jan 12 trials: litter types and counts, placement layouts, surfaces, number of runs per condition, what to record per run (matching the trial log fields), how to run the summary, and a table to fill in. Mark the research question and success criterion as "TODO: Bryan to fill in"; use the 80 percent pickup target from the project notes as a labeled default. (Done: `docs/TRIAL_PLAN.md` with default litter types/counts, 4 layouts, surfaces, 3 runs per condition, per-run fields matching the trial log, summary commands, and results/totals tables; research question, success criterion and real litter/surface lists are TODO: Bryan to fill in; 80 percent shown as labeled default; `test_trial_plan_doc.py`.)
 - [x] 30. Progress summary tool. `tools/status.py` prints, from the repo only: hardware test rows done, pass, fail and not yet run (parsed from `docs/HARDWARE_TESTS.md`), unset values in `robot.yaml`, and trial pickup rate if a trial log is given. Output short plain text so Bryan can run it before a session. (Done: `tools/status.py` (run `python3 tools/status.py [trial log files or dirs]`) on top of pure-Python `status_logic.py`: hardware test rows pass/fail/not run/notes-only, unset required values per subsystem (same rules as `hardware_check`), trial pickup rate vs the 80 percent default target if a log is given; 6 tests in `test_status_logic.py`.)
