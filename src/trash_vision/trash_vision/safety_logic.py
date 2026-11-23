@@ -15,6 +15,11 @@ DEFAULTS = {
     # Front sonar minimum below which all motion is forced to zero. Keep it
     # below behavior stop_distance so normal avoidance acts first.
     'safety_hard_stop_distance': 0.12,  # m
+    # True: below the hard stop distance only FORWARD motion is cut to zero;
+    # reversing and turning still pass (ramped), so the robot can back or
+    # turn away from what it is touching instead of wedging there forever.
+    # False: everything is forced to zero (old behavior).
+    'safety_hard_stop_escape': True,
     # No behavior update for this long -> zero velocity.
     'safety_behavior_timeout': 0.5,    # s
     # True: stop if no sonar has ever reported. False: allow a robot without
@@ -34,6 +39,20 @@ def sonars_healthy(names, stamps, now, stale_after_s, require_any=True):
     if not seen:
         return not require_any
     return all(now - s <= stale_after_s for s in seen)
+
+
+def front_minimum(values):
+    """Smallest front range; a NaN reading counts as 0 (blocked).
+
+    The builtin ``min`` is order dependent with NaN, so a bad reading could
+    hide behind a good one. An empty list reads NaN (unknown -> stop).
+    """
+    best = math.inf
+    for v in values:
+        if v is None or math.isnan(v):
+            return 0.0
+        best = min(best, v)
+    return best if values else math.nan
 
 
 def _clamp(value, limit):
@@ -88,19 +107,27 @@ class SafetyStage:
             return self._stop(now, 'behavior_timeout')
         if not sonars_ok:
             return self._stop(now, 'sonars_stale')
-        if front_min is None or math.isnan(front_min) or \
-                front_min < self.cfg['safety_hard_stop_distance']:
+        if front_min is None or math.isnan(front_min):
             return self._stop(now, 'front_hard_stop')
+        blocked = front_min < self.cfg['safety_hard_stop_distance']
+        if blocked and not self.cfg['safety_hard_stop_escape']:
+            return self._stop(now, 'front_hard_stop')
+        if blocked:
+            # Cut forward motion at once; reverse and turning stay allowed.
+            linear = min(linear, 0.0)
+            self.linear = min(self.linear, 0.0)
         lin = _clamp(linear, self.cfg['safety_max_linear'])
         ang = _clamp(angular, self.cfg['safety_max_angular'])
         reason = 'clamped' if (lin != linear or ang != angular) else ''
+        if blocked:
+            reason = 'front_hard_stop'
         if self._last_out is not None:
             dt = max(0.0, now - self._last_out)
             la = self.cfg['safety_max_linear_accel'] * dt
             aa = self.cfg['safety_max_angular_accel'] * dt
             ramped_l = _ramp(self.linear, lin, la)
             ramped_a = _ramp(self.angular, ang, aa)
-            if ramped_l != lin or ramped_a != ang:
+            if (ramped_l != lin or ramped_a != ang) and not blocked:
                 reason = 'accel_limited'
             lin, ang = ramped_l, ramped_a
         else:

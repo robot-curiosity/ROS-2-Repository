@@ -155,7 +155,8 @@ class BehaviorNode(Node):
             FRONT + REAR + LEFT + RIGHT, self._range_stamps, now, stale,
             bool(self.get_parameter('safety_require_sonars').value))
         lin, ang = self._safety.apply(
-            now, float(cmd.linear), float(cmd.angular), min(front),
+            now, float(cmd.linear), float(cmd.angular),
+            sfl.front_minimum(front),
             sonars_ok)
         self._log_safety()
         twist = Twist()
