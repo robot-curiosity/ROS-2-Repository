@@ -64,7 +64,8 @@ def test_decel_limited_for_normal_command():
 
 def test_hard_stop_forces_zero_immediately():
     """Check hard stop forces zero immediately."""
-    s = fresh_stage(safety_hard_stop_distance=0.15)
+    s = fresh_stage(safety_hard_stop_distance=0.15,
+                    safety_hard_stop_escape=False)
     for i in range(1, 40):
         s.note_update(i * 0.1)
         s.apply(i * 0.1, 0.4, 0.5, 2.0)

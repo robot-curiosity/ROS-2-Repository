@@ -173,5 +173,6 @@ behavior:
     safety_max_linear_accel: 0.5   # m/s^2 acceleration limit
     safety_max_angular_accel: 2.0  # rad/s^2 angular acceleration limit
     safety_hard_stop_distance: 0.12  # metres; front sonar below this forces zero velocity (keep below stop_distance)
+    safety_hard_stop_escape: true  # true: below hard stop only forward motion is cut, reverse/turn still allowed; false: everything zero
     safety_behavior_timeout: 0.5  # seconds without a behavior update before zero velocity
     safety_require_sonars: true   # true: stop if no sonar ever reported; false only for bring-up without sonars

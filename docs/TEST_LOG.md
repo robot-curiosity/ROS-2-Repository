@@ -41,3 +41,4 @@
 - 2026-11-20: item 26 (package.xml hygiene): pytest 241 passed (ament linter tests ignored); flake8 not installable-checked, new test file is plain. No behavior change.
 - 2026-11-22: item 27 (Pico wheel-loop option): pytest 279 passed locally with PYTHONPATH set (ament linter tests ignored, ament not installed; 38 new Pico tests incl. fake-serial loopback); errors-only flake8 on src and firmware clean. Firmware not run on a real Pico.
 - 2026-11-22: item 28 (sim noise + arm model): pytest 288 passed locally with PYTHONPATH set (ament linter tests ignored); 9 new tests in test_sim_noise_arm.py; flake8 clean on touched files. Sim only, nothing run on the robot.
+- 2026-11-22: item 29 (fault-injection tests): pytest 309 passed locally with PYTHONPATH set (ament linter tests ignored); 22 new tests in test_fault_injection.py; flake8 clean on touched files. Sim/pure logic only, nothing run on the robot.
