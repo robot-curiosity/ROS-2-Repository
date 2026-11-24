@@ -1,5 +1,6 @@
 """Pure-Python helpers for the SO101 arm node (no ROS or LeRobot needed)."""
 from dataclasses import dataclass
+import json
 import math
 
 from trash_vision import arm_kinematics as ak
@@ -35,8 +36,38 @@ def clamp(value, low, high):
 
 
 def clamp_pose(pose, limits):
-    """Clamp each joint to its (low, high) limit."""
+    """Clamp each joint to its (low, high) limit.
+
+    Raises ValueError for a non-finite value (``min``/``max`` would turn
+    NaN into the upper limit and drive that joint there).
+    """
+    if not all(math.isfinite(p) for p in pose):
+        raise ValueError('pose has a non-finite value: %r' % (list(pose),))
     return [clamp(p, lo, hi) for p, (lo, hi) in zip(pose, limits)]
+
+
+def parse_target_xy(text):
+    """Return (base_x, base_y) from /vision/target JSON text, or None.
+
+    None for bad JSON, a non-object, a missing or null coordinate, or a
+    non-finite or non-numeric value (a bad message must not crash the node).
+    """
+    try:
+        data = json.loads(text)
+    except (TypeError, ValueError):
+        return None
+    if not isinstance(data, dict):
+        return None
+    try:
+        x, y = data['base_x'], data['base_y']
+        if isinstance(x, bool) or isinstance(y, bool):
+            return None
+        x, y = float(x), float(y)
+    except (KeyError, TypeError, ValueError):
+        return None
+    if not (math.isfinite(x) and math.isfinite(y)):
+        return None
+    return x, y
 
 
 def validate_pose(pose, n=len(JOINT_NAMES)):

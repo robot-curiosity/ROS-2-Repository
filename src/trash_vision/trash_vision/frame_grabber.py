@@ -8,6 +8,7 @@ frame; the detector takes whatever is newest, at most once per frame.
 """
 
 import collections
+import math
 import threading
 import time
 
@@ -121,6 +122,8 @@ def timer_period_s(rate_hz, minimum_hz=0.5, maximum_hz=60.0):
     try:
         hz = float(rate_hz)
     except (TypeError, ValueError):
+        hz = 10.0
+    if not math.isfinite(hz):
         hz = 10.0
     hz = min(max(hz, minimum_hz), maximum_hz)
     return 1.0 / hz

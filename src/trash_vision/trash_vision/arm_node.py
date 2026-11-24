@@ -140,13 +140,9 @@ class ArmNode(Node):
 
     # Latest detector target (base_x/base_y in base_link):
     def _on_target(self, msg) -> None:
-        try:
-            data = json.loads(msg.data)
-        except ValueError:
-            return
-        if (isinstance(data, dict) and data.get('base_x') is not None
-                and data.get('base_y') is not None):
-            self._target = (float(data['base_x']), float(data['base_y']))
+        xy = al.parse_target_xy(msg.data)
+        if xy is not None:
+            self._target = xy
             self._target_time = time.monotonic()
 
     # Build the pose table for one pick (IK if enabled and target fresh):
@@ -234,8 +230,9 @@ class ArmNode(Node):
                 name, poses, grip_open, grip_closed)
             step = float(self.get_parameter('max_step').value)
             period = float(self.get_parameter('step_period_s').value)
+            # Check every pose before moving (a bad one raises here).
+            targets = [al.clamp_pose(t, self._limits) for t in targets]
             for target in targets:
-                target = al.clamp_pose(target, self._limits)
                 with self._lock:
                     current = self._backend.read()
                 for pose in al.interpolate(current, target, step):
