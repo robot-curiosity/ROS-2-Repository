@@ -84,7 +84,7 @@ class DetectionFilter:
 
     def _is_usable(self, c):
         """Return True if c is confident enough and outside the ignore regions."""
-        if c.confidence < self.min_confidence:
+        if not c.confidence >= self.min_confidence:  # also rejects NaN
             return False
         return not in_region(c, self.ignore_regions)
 

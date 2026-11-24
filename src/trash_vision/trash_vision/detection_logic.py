@@ -1,6 +1,7 @@
 """Pure-Python helpers for the trash detector (no ROS, camera or model needed)."""
 import base64
 import json
+import math
 import re
 
 from trash_vision import ground_projection
@@ -124,6 +125,8 @@ def parse_gpt_response(text):
         confidence = float(data.get('confidence', 0.5))
     except (KeyError, TypeError, ValueError):
         return None
+    if not math.isfinite(confidence):
+        confidence = 0.5
     if not all(0.0 <= v <= 1.0 for v in (x1, y1, x2, y2)):
         return None
     if x2 <= x1 or y2 <= y1:

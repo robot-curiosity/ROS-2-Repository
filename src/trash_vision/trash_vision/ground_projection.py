@@ -10,7 +10,7 @@ Defaults are from CAD V16-18 per STATE.md, not measured (camera height is
 (41 deg) is the standard Camera Module 3 lens guess: check against the stream.
 """
 from dataclasses import dataclass
-from math import cos, radians, sin, tan
+from math import cos, isfinite, radians, sin, tan
 
 
 @dataclass(frozen=True)
@@ -35,10 +35,12 @@ def camera_from_degrees(x, y, height, pitch_deg, hfov_deg, vfov_deg):
 def floor_point_to_base(u, v, cam=None):
     """Project a normalized image point on the ground to (x, y) in base_link.
 
-    Returns None if the point is at or above the horizon, or the camera
-    model is invalid.
+    Returns None if the point is at or above the horizon, the camera
+    model is invalid, or the input or result is not a finite number.
     """
     cam = cam or CameraModel()
+    if not (isfinite(u) and isfinite(v)):
+        return None
     if cam.height <= 0.0:
         return None
     right = (u - 0.5) * 2.0 * tan(cam.hfov_rad / 2.0)   # right of axis
@@ -48,4 +50,7 @@ def floor_point_to_base(u, v, cam=None):
     if down <= 1e-9:
         return None
     scale = cam.height / down
-    return cam.x + scale * forward, cam.y - scale * right
+    x, y = cam.x + scale * forward, cam.y - scale * right
+    if not (isfinite(x) and isfinite(y)):
+        return None
+    return x, y
