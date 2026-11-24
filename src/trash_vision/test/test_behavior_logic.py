@@ -294,3 +294,42 @@ def test_stale_front_sonar_stops_forward_motion():
 
     assert drive({'front_1': 9.9, 'front_2': 9.9}).linear > 0.0
     assert drive({'front_1': 5.0, 'front_2': 9.9}).linear <= 0.0
+
+
+def _target(**over):
+    tgt = {'detected': True, 'confidence': 0.9, 'horizontal_error': 0.1,
+           'floor_point_normalized': {'x': 0.5, 'y': 0.5}}
+    tgt.update(over)
+    return tgt
+
+
+def test_review_malformed_targets_are_rejected():
+    bad = [
+        _target(horizontal_error=math.nan),
+        _target(horizontal_error=None),
+        _target(confidence=None),
+        _target(confidence='high'),
+        _target(floor_point_normalized={'x': 0.5}),
+        _target(floor_point_normalized={'x': 0.5, 'y': math.nan}),
+        _target(floor_point_normalized=None),
+        ['not', 'a', 'dict'],
+    ]
+    assert bl.valid_target(_target(), 0.3)
+    for tgt in bad:
+        assert not bl.valid_target(tgt, 0.3), tgt
+
+
+def test_review_nan_target_never_steers_the_robot():
+    m = bl.BehaviorMachine({'search_pattern': 'spin'})
+    cmd = m.step(1.0, _target(horizontal_error=math.nan), [2.0, 2.0],
+                 [2.0, 2.0])
+    assert m.state == bl.SEARCH
+    assert cmd.linear == 0.0 and abs(cmd.angular) == 0.5
+
+
+def test_review_nan_pose_falls_back_to_spin():
+    m = bl.BehaviorMachine()
+    cmd = m.step(1.0, None, [2.0, 2.0], [2.0, 2.0],
+                 pose=(math.nan, 0.0, 0.0))
+    assert cmd.linear == 0.0
+    assert abs(cmd.angular) == m.p['search_turn_speed']
