@@ -24,7 +24,7 @@ class TrashDetector(Node):
     def __init__(self) -> None:
         """Declare parameters, load the model and start the workers."""
         # Initialization:
-        super().__init__('trash_detector')
+        super().__init__('detector')
 
         # Parameters:
         self.declare_parameters(
