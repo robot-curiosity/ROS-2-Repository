@@ -1,7 +1,6 @@
 """Arm node: SO101 pick service with a dry-run or LeRobot backend."""
 
 # Imports:
-import json
 import threading
 import time
 
