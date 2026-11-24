@@ -83,21 +83,26 @@ def run():
     buf = ''
     for line in pico.hello():
         print(line)
-    while True:
-        now = time.ticks_ms()
-        while poller.poll(0):
-            ch = sys.stdin.read(1)
-            if ch == '\n':
-                for reply in pico.handle_line(buf, now):
-                    print(reply)
-                buf = ''
-            elif len(buf) < 200:
-                buf += ch
-            else:
-                buf = ''
-        for line in pico.poll(now):
-            print(line)
-        time.sleep_ms(2)
+    try:
+        while True:
+            now = time.ticks_ms()
+            while poller.poll(0):
+                ch = sys.stdin.read(1)
+                if ch == '\n':
+                    for reply in pico.handle_line(buf, now):
+                        print(reply)
+                    buf = ''
+                elif len(buf) < 200:
+                    buf += ch
+                else:
+                    buf = ''
+            for line in pico.poll(now):
+                print(line)
+            time.sleep_ms(2)
+    finally:
+        # Any exception or Ctrl-C: the RP2040 PWM keeps running at its last
+        # duty unless it is zeroed, so stop the motors before leaving.
+        hw.stop_all()
 
 
 run()

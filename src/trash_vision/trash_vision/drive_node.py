@@ -118,8 +118,9 @@ class DriveNode(Node):
 
     # cmd_vel:
     def _on_cmd(self, msg: Twist) -> None:
+        linear, angular = dl.sanitize_twist(msg.linear.x, msg.angular.z)
         left, right = dl.twist_to_wheels(
-            msg.linear.x, msg.angular.z,
+            linear, angular,
             self.get_parameter('track_width_m').value)
         left, right = dl.limit_wheel_speeds(
             left, right, self.get_parameter('max_wheel_speed_mps').value)

@@ -66,6 +66,7 @@ class BridgeSession:
 
     def send_velocity(self, linear, angular):
         """Send wheel targets (m/s) from a Twist; returns the pair sent."""
+        linear, angular = dl.sanitize_twist(linear, angular)
         left, right = dl.twist_to_wheels(
             linear, angular, float(self._params['track_width_m']))
         left, right = dl.limit_wheel_speeds(

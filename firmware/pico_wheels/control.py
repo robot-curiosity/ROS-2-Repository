@@ -116,6 +116,10 @@ class WheelController:
         self._cmd_ms = now_ms
         self.watchdog = False
 
+    def reset_encoders(self):
+        """Forget the last raw counts (the decoders were recreated)."""
+        self._last_raw = None
+
     def stop(self):
         """Zero both targets."""
         self.target = [0.0, 0.0]

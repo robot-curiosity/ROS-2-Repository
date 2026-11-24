@@ -93,11 +93,13 @@ class UltrasonicArray(Node):
         if name is None:
             return
         s = self._by_name[name]
-        try:
-            pulse = self._ping(s['device'])
-        except Exception:
-            pulse = None
+        ok, pulse = ss.try_ping(lambda: self._ping(s['device']))
         self._sched.fired(time.monotonic())
+        if not ok:
+            # GPIO error: publish nothing so the sensor goes stale (blocked).
+            self.get_logger().error(
+                'Ping failed on %s' % name, throttle_duration_sec=5.0)
+            return
         rng, _status = ss.validate_range(pulse)
         rng = s['filter'].update(rng)
         msg = Range()
