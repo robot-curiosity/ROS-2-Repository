@@ -143,3 +143,13 @@ def test_sonars_healthy_rules():
     assert sl.sonars_healthy(['a'], {}, 10.0, 2.0, require_any=False)
     # One stale sensor among fresh ones is unhealthy.
     assert not sl.sonars_healthy(['a', 'b'], {'a': 1.0, 'b': 9.9}, 10.0, 2.0)
+
+
+def test_review_reset_forgets_motion_and_requires_new_update():
+    s = sl.SafetyStage()
+    s.note_update(0.0)
+    s.apply(0.1, 0.3, 0.0, 2.0)
+    s.reset()
+    assert (s.linear, s.angular) == (0.0, 0.0)
+    assert s.timed_out(0.2)
+    assert s.apply(0.2, 0.3, 0.0, 2.0) == (0.0, 0.0)

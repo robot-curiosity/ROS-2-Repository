@@ -48,6 +48,7 @@ class BehaviorNode(Node):
         self._safety = sfl.SafetyStage(
             {k: self.get_parameter(k).value for k in sfl.DEFAULTS})
         self._last_safety_reason = ''
+        self._was_enabled = False
 
         self._recorder = self._make_recorder()
         self._target = None
@@ -96,6 +97,17 @@ class BehaviorNode(Node):
         self.get_logger().info('logging pickup attempts to %s' % path)
         return tl.TrialRecorder(self._machine, self._log_writer, run_id)
 
+    # True while enabled; on the switch to disabled publish zero once so the
+    # last cmd_vel cannot keep the robot moving:
+    def _check_enabled(self) -> bool:
+        enabled = bool(self.get_parameter('enabled').value)
+        if self._was_enabled and not enabled:
+            self._cmd_pub.publish(Twist())
+            self._safety.reset()
+            self.get_logger().warning('behavior disabled: sent zero velocity')
+        self._was_enabled = enabled
+        return enabled
+
     # Time in seconds:
     def _now(self):
         return self.get_clock().now().nanoseconds / 1e9
@@ -120,11 +132,13 @@ class BehaviorNode(Node):
             self._target = json.loads(msg.data)
         except ValueError:
             self._target = None
+        if not isinstance(self._target, dict):
+            self._target = None
         self._target_stamp = self._now()
 
     # Main loop:
     def _tick(self) -> None:
-        if not self.get_parameter('enabled').value:
+        if not self._check_enabled():
             return
         now = self._now()
         # Never-heard sensors read 'inf' (not installed); sensors that went
@@ -169,7 +183,7 @@ class BehaviorNode(Node):
 
     # Publish zero if the main tick stopped running (enabled only):
     def _watchdog(self) -> None:
-        if not self.get_parameter('enabled').value:
+        if not self._check_enabled():
             return
         if self._safety.timed_out(self._now()):
             self._cmd_pub.publish(Twist())

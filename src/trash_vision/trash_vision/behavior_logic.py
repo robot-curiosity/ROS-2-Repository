@@ -90,13 +90,32 @@ def clamp(value, limit):
     return max(-limit, min(limit, value))
 
 
+def _finite(value):
+    """Return the float value, or None if it is missing, not a number or NaN."""
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return None
+    return number if math.isfinite(number) else None
+
+
 def valid_target(target, min_confidence):
-    """Return True if a /vision/target dict is a usable detection."""
-    if not target or not target.get('detected'):
+    """Return True if a /vision/target dict is a usable detection.
+
+    Every number the state machine later reads must be finite, so a NaN or a
+    missing key from the detector can never reach the steering code.
+    """
+    if not isinstance(target, dict) or not target.get('detected'):
         return False
-    if float(target.get('confidence', 0.0)) < min_confidence:
+    confidence = _finite(target.get('confidence', 0.0))
+    if confidence is None or confidence < min_confidence:
         return False
-    return 'horizontal_error' in target and 'floor_point_normalized' in target
+    if _finite(target.get('horizontal_error')) is None:
+        return False
+    floor = target.get('floor_point_normalized')
+    if not isinstance(floor, dict):
+        return False
+    return _finite(floor.get('y')) is not None
 
 
 class BehaviorMachine:
@@ -186,6 +205,8 @@ class BehaviorMachine:
         right). left/right default to "nothing seen" so older callers work.
         pose is odometry (x, y, yaw); without it SEARCH just spins.
         """
+        if pose is not None and not all(math.isfinite(v) for v in pose):
+            pose = None  # bad odometry: SEARCH falls back to spinning
         self._pose = pose
         cmd = self._step(now, target, front, rear)
         return self._limit_spin(cmd, left, right)

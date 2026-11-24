@@ -82,6 +82,14 @@ class SafetyStage:
         """Record that behavior produced a fresh command at ``now``."""
         self._last_update = now
 
+    def reset(self):
+        """Forget the last output (call when behavior is switched off)."""
+        self.linear = 0.0
+        self.angular = 0.0
+        self.reason = ''
+        self._last_out = None
+        self._last_update = None
+
     def timed_out(self, now):
         """Return True if behavior has not updated within the timeout."""
         if self._last_update is None:
