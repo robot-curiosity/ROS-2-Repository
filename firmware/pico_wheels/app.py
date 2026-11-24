@@ -8,6 +8,8 @@ Hardware sits behind a small `hw` object, so the same code runs on the Pico
     set_motor(side, duty, forward)   side 0 = left, 1 = right
     stop_all()                PWM to zero on both sides
 """
+import math
+
 import control
 import protocol
 
@@ -81,6 +83,9 @@ class PicoApp:
             return [protocol.msg_error('BAD_ARGS')]
         if not (self.pins_ok and self.ctrl.configured):
             return [protocol.msg_error('NOT_CONFIGURED')]
+        if not all(math.isfinite(a) for a in args):
+            self.ctrl.stop()    # NaN or inf must never become a speed target
+            return [protocol.msg_error('BAD_ARGS')]
         self.ctrl.set_target(float(args[0]), float(args[1]), now_ms)
         return []
 
@@ -95,6 +100,7 @@ class PicoApp:
             return [protocol.msg_error('PIN_SETUP_FAILED')]
         self.fault = False
         self.pins_ok = True
+        self.ctrl.reset_encoders()    # new decoders start at 0
         return []
 
     def _on_cfg(self, args):
@@ -102,6 +108,8 @@ class PicoApp:
         if len(args) != len(names) or not all(
                 isinstance(a, (int, float)) for a in args):
             return [protocol.msg_error('BAD_ARGS')]
+        if not all(math.isfinite(a) for a in args):
+            return [protocol.msg_error('BAD_CFG')]
         cfg = dict(zip(names, args))
         for key in ('ticks_per_rev', 'wheel_radius_m', 'max_speed_mps',
                     'cmd_timeout_ms'):

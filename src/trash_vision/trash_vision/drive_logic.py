@@ -27,6 +27,15 @@ class QuadratureDecoder:
         return delta
 
 
+# A cmd_vel with a NaN or inf is replaced by a stop (review pass 2):
+def sanitize_twist(linear, angular):
+    try:
+        ok = math.isfinite(linear) and math.isfinite(angular)
+    except TypeError:
+        ok = False
+    return (linear, angular) if ok else (0.0, 0.0)
+
+
 # Twist -> wheel linear speeds (m/s):
 def twist_to_wheels(linear: float, angular: float, track_width: float):
     left = linear - angular * track_width / 2.0
@@ -45,6 +54,8 @@ def limit_wheel_speeds(left: float, right: float, max_speed: float):
 
 # Signed command in -1..1 -> (duty 0..1, forward bool), with a dead band:
 def command_to_pwm(command: float, min_duty: float = 0.0):
+    if not math.isfinite(command):
+        return 0.0, True
     command = max(-1.0, min(1.0, command))
     if abs(command) < 1e-3:
         return 0.0, True
@@ -54,6 +65,8 @@ def command_to_pwm(command: float, min_duty: float = 0.0):
 
 # Limits how fast a value may change per second:
 def slew(current: float, target: float, max_rate: float, dt: float) -> float:
+    if not math.isfinite(target):
+        target = 0.0
     if max_rate <= 0.0:
         return target
     step = max_rate * dt

@@ -50,6 +50,18 @@ class SonarScheduler:
         return len(self.names) * (self.settle_gap_s + echo_timeout_s)
 
 
+def try_ping(ping):
+    """Run ``ping()``; return (True, pulse_s or None) or (False, None).
+
+    A GPIO error must not look like "no obstacle": the caller publishes
+    nothing when this returns False, so the sensor goes stale (blocked).
+    """
+    try:
+        return True, ping()
+    except Exception:
+        return False, None
+
+
 def measure_echo(read_pin, clock, timeout_s):
     """Time the echo pulse; return its width in seconds or None.
 
