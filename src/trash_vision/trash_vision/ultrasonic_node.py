@@ -16,7 +16,7 @@ class UltrasonicArray(Node):
 
     # Initialization:
     def __init__(self) -> None:
-        super().__init__('ultrasonic_array')
+        super().__init__('ultrasonic')
 
         n = len(ul.SENSOR_NAMES)
         # TODO: Bryan to fill in the real BCM GPIO pins (-1 = sensor unused).

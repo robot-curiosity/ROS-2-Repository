@@ -1,4 +1,5 @@
 """Console script: print pickup rate by litter type and per run."""
+import argparse
 import os
 import sys
 
@@ -9,7 +10,11 @@ DEFAULT_DIR = os.path.join('~', 'curiosity_trials')
 
 def main(argv=None):
     """Print the summary for the given log files or directories."""
-    args = sys.argv[1:] if argv is None else argv
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('paths', nargs='*',
+                        help='log files or folders (default: %s)'
+                        % DEFAULT_DIR)
+    args = parser.parse_args(argv).paths
     if not args:
         args = [os.path.expanduser(DEFAULT_DIR)]
     paths = tl.find_logs(args)
