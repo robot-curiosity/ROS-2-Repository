@@ -52,7 +52,6 @@ Order matters; later items assume earlier ones. One item per run, one PR each.
 The end goal Bryan set: as each part of the robot is assembled he only puts values into `config/robot.yaml`, runs one command and tests it. Items 10-14 build that path first; everything after improves behavior and software quality.
 
 
-- [ ] 37. Review summary. `docs/reviews/SUMMARY.md`: one page for Bryan with the open findings from items 33-36 sorted by severity, what to look at first on the real robot, and which hardware tests would confirm or clear each one. Add any missing hardware-test rows.
 
 If every item is done or blocked, stop and say so in the run summary. Do not invent new work.
 
@@ -67,6 +66,7 @@ If every item is done or blocked, stop and say so in the run summary. Do not inv
 
 ## Done
 
+- [x] 37. Review summary. `docs/reviews/SUMMARY.md`: one page for Bryan with the open findings from items 33-36 sorted by severity, what to look at first on the real robot, and which hardware tests would confirm or clear each one. Add any missing hardware-test rows. (Done: `docs/reviews/SUMMARY.md` with 15 open findings by severity, a first-look order, and 3 new HARDWARE_TESTS rows for dead sonar, stopping distance and boxed-in search.)
 - [x] 36. Review pass 4: wiring of the whole package. (Done: `docs/reviews/REVIEW-wiring.md` with a topic table. Fixed with tests in `test_wiring.py`: detector and ultrasonic node names now match their yaml sections (`--params-file` works with `ros2 run`), `trial_summary --help` works. Also checks yaml vs declared parameters, entry points and BRINGUP.md names.)
 
 - [x] 35. Review pass 3: vision and arm. (Done: `docs/reviews/REVIEW-vision-arm.md`. Fixed with tests in `test_review_vision_arm.py`: NaN pose clamped to the upper joint limit (`clamp_pose`, all poses now checked before the first move), a bad `/vision/target` value crashing the arm node (`parse_target_xy`), NaN/inf from `floor_point_to_base`, NaN confidence in the filter and GPT parser, NaN `process_rate_hz`. Open findings for Bryan listed there; HARDWARE_TESTS rows added.)
