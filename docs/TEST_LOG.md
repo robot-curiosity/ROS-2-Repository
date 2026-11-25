@@ -49,3 +49,4 @@
 - 2026-11-24: item 34 (review pass 2, drive/sonar/Pico): 8 new regression tests in test_review_drive.py; PYTHONPATH=src/trash_vision pytest 333 passed locally (ament linter tests ignored); errors-only flake8 clean on touched files. Node and firmware changes need ROS / the Pico, not run here.
 - 2026-11-24: item 35 (review pass 3, vision/arm): 8 new regression tests in test_review_vision_arm.py; PYTHONPATH=. pytest 341 passed locally from src/trash_vision (ament linter tests ignored); flake8 errors-only clean after CI fix. Node changes (arm_node) need ROS and the arm, not run here.
 - 2026-11-24: item 36 (review pass 4, wiring): 11 new tests in test_wiring.py; pytest 352 passed locally from src/trash_vision (ament linter tests ignored); flake8 not installed locally. Node renames need ROS, not run here.
+- 2026-11-24: item 37 (review summary): docs only (`docs/reviews/SUMMARY.md`, 3 hardware-test rows); no code changed, existing pytest unaffected.
