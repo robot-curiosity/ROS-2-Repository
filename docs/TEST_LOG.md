@@ -50,3 +50,4 @@
 - 2026-11-24: item 35 (review pass 3, vision/arm): 8 new regression tests in test_review_vision_arm.py; PYTHONPATH=. pytest 341 passed locally from src/trash_vision (ament linter tests ignored); flake8 errors-only clean after CI fix. Node changes (arm_node) need ROS and the arm, not run here.
 - 2026-11-24: item 36 (review pass 4, wiring): 11 new tests in test_wiring.py; pytest 352 passed locally from src/trash_vision (ament linter tests ignored); flake8 not installed locally. Node renames need ROS, not run here.
 - 2026-11-24: item 37 (review summary): docs only (`docs/reviews/SUMMARY.md`, 3 hardware-test rows); no code changed, existing pytest unaffected.
+- 2026-11-25: item 38 (test-result helper): new tests in test_record_result.py; pytest 362 passed locally from src/trash_vision (ament linter tests ignored); flake8 clean on the new files; `record_result.py next` run on the real table. Not run on the Pi.

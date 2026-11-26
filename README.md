@@ -65,6 +65,8 @@ After editing `robot.yaml`, run `colcon build --packages-select trash_vision` an
 - `ros2 run trash_vision trial_summary`: pickup rate from trial logs; plan in `docs/TRIAL_PLAN.md`.
 - `python3 tools/status.py`: hardware test progress and unset config values, from the repo only.
 - `docs/HARDWARE_TESTS.md`: tests to run on the robot and their results.
+- `tools/record_result.py`: `next` shows the next untested row; `pass <n> "note"` or
+  `fail <n> "note"` records it (commit and push the file so the agent sees it).
 - `docs/PIN_BUDGET.md`, `docs/BOM.md`, `docs/PICO_PROTOCOL.md`, `docs/DECISIONS.md`, `docs/TODO.md`.
 
 ## Tests on a PC
