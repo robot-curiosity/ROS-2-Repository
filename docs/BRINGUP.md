@@ -58,7 +58,7 @@ let `hardware_check` catch duplicates.
 
 ## 4. Drive calibration
 
-- Fill in: `drive.wheel_radius_m`, `drive.track_width_m` (CAD 0.060 and 0.481 are not measured), `kp`, `ki` if the speed oscillates.
+- Fill in: `drive.wheel_radius_m`, `drive.track_width_m` (CAD 0.060 and 0.481 are not measured), `kp`, `ki` if the speed oscillates (`ros2 run trash_vision tune_wheels`, wheels off the ground, measures the response; see `docs/HARDWARE_TESTS.md`).
 - Run: `ros2 run trash_vision calibrate_drive`, put the robot on the floor only when the tool asks, clear 2 m ahead, hand on the power. Paste the printed corrections.
 - PASS: commanded distance matches the tape measure within about 5 %, and a commanded 360 degree turn comes back within about 10 degrees.
 - Common failure: drives a curve (one wheel radius or one invert flag is wrong); turns too little or too much (track width).
