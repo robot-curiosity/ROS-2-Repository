@@ -47,6 +47,9 @@ setup(
             'bench = trash_vision.bench:run',
             'dashboard = trash_vision.dashboard:main',
             'tune_wheels = trash_vision.tune_wheels:run',
+            'record_trial = trash_vision.record_trial:run',
+            'analyze_run = trash_vision.analyze_run:run',
+            'replay_run = trash_vision.replay_run:run',
         ],
     },
 )

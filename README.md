@@ -65,6 +65,11 @@ After editing `robot.yaml`, run `colcon build --packages-select trash_vision` an
 - `ros2 run trash_vision tune_wheels` (wheels off the ground): speed step per side,
   rise/overshoot/settling, CSV and SVG plot, suggested gains (not verified) after a
   run with `kp: 0.0`, `ki: 0.0`. Also `tools/tune_wheels.py`.
+- `ros2 run trash_vision record_trial`: ros2 bag recording, parameters, trial log and
+  Enter-key marks into `~/curiosity_runs/<date>_runNN` (needs `sudo apt install
+  ros-jazzy-rosbag2-storage-mcap` if MCAP is missing). Then `analyze_run <folder>`
+  (stopping distance, sonar delay, loop rates, dropped frames) and `replay_run <folder>`
+  (feeds the data back through the behavior logic; `--at`, `--set name=value`).
 - `ros2 run trash_vision trial_summary`: pickup rate from trial logs; plan in `docs/TRIAL_PLAN.md`.
 - `ros2 run trash_vision dashboard`: live web page (sonars, wheels, state, detections, safety stops) on port 8080 of the Pi; read-only unless started with `--allow-write` (no password, trusted networks only).
 - `python3 tools/status.py`: hardware test progress and unset config values, from the repo only.
