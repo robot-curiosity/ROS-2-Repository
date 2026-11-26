@@ -50,6 +50,7 @@ setup(
             'record_trial = trash_vision.record_trial:run',
             'analyze_run = trash_vision.analyze_run:run',
             'replay_run = trash_vision.replay_run:run',
+            'sweep_sim = trash_vision.sweep_sim:run',
         ],
     },
 )
