@@ -72,6 +72,9 @@ After editing `robot.yaml`, run `colcon build --packages-select trash_vision` an
   (feeds the data back through the behavior logic; `--at`, `--set name=value`).
 - `ros2 run trash_vision trial_summary`: pickup rate from trial logs; plan in `docs/TRIAL_PLAN.md`.
 - `ros2 run trash_vision dashboard`: live web page (sonars, wheels, state, detections, safety stops) on port 8080 of the Pi; read-only unless started with `--allow-write` (no password, trusted networks only).
+- `python3 tools/sweep_sim.py` (or `ros2 run trash_vision sweep_sim`): tries behavior settings
+  in the pure-Python sim and ranks them (`--param name=v1,v2` grid or `--random N`; a few
+  minutes on a PC). Sim-only suggestions that need confirmation on the real robot.
 - `python3 tools/status.py`: hardware test progress and unset config values, from the repo only.
 - `docs/HARDWARE_TESTS.md`: tests to run on the robot and their results.
 - `tools/record_result.py`: `next` shows the next untested row; `pass <n> "note"` or

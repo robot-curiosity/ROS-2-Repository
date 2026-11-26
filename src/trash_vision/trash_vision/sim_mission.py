@@ -4,6 +4,7 @@ No ROS needed. Gives a repeatable "collected fraction" for CI and for
 tracking the 80% pickup target in software (not a real-robot number).
 """
 from trash_vision import behavior_logic as bl
+from trash_vision import safety_logic as sfl
 from trash_vision import search_pattern as sp
 from trash_vision import sim_logic as sl
 from trash_vision import trial_log as tl
@@ -78,7 +79,7 @@ def pickup_rate_by_type(result):
 
 def run_mission(litter, duration=600.0, dt=0.05, width=4.0, height=4.0,
                 params=None, recorder_sink=None, search_only=False,
-                noise=None, arm=None):
+                noise=None, arm=None, safety=None):
     """Simulate one mission; return a dict of results.
 
     Keys: total, collected, fraction, duration, states (visit counts),
@@ -86,6 +87,10 @@ def run_mission(litter, duration=600.0, dt=0.05, width=4.0, height=4.0,
     Also total_by_type and collected_by_type (litter type -> count).
     noise is a sim_logic.SimNoise (seeded) or None; arm is an
     arm_logic.PickConfig or None (see SimWorld).
+    safety is a fresh safety_logic.SafetyStage that filters the drive
+    commands as the behavior node does, or None to drive them unfiltered.
+    safety_stops counts the times that stage began a front hard stop (always
+    0 without one).
     The odometry pose is the world pose relative to the start (centre).
     """
     if arm is not None:
@@ -105,6 +110,8 @@ def run_mission(litter, duration=600.0, dt=0.05, width=4.0, height=4.0,
     last_state = None
     frame = 0
     now = 0.0
+    safety_stops = 0
+    hard_stopped = False
     while now < duration and (search_only or world.litter or world.held):
         frame += 1
         if pending and now >= pending[1]:
@@ -131,9 +138,17 @@ def run_mission(litter, duration=600.0, dt=0.05, width=4.0, height=4.0,
         if cmd.arm_action and pending is None:
             pending = (cmd.arm_action,
                        now + ARM_DURATION[cmd.arm_action])
+        linear, angular = cmd.linear, cmd.angular
+        if safety is not None:
+            safety.note_update(now)
+            linear, angular = safety.apply(
+                now, linear, angular,
+                sfl.front_minimum([r['front_1'], r['front_2']]))
+            blocked = safety.reason == 'front_hard_stop'
+            safety_stops += 1 if blocked and not hard_stopped else 0
+            hard_stopped = blocked
         busy = pending is not None
-        world.step(0.0 if busy else cmd.linear,
-                   0.0 if busy else cmd.angular, dt)
+        world.step(0.0 if busy else linear, 0.0 if busy else angular, dt)
         if machine.state != last_state:
             visits[machine.state] = visits.get(machine.state, 0) + 1
             last_state = machine.state
@@ -143,6 +158,7 @@ def run_mission(litter, duration=600.0, dt=0.05, width=4.0, height=4.0,
     return {'total': total, 'collected': collected,
             'fraction': collected / total if total else 1.0,
             'duration': now, 'states': visits,
+            'safety_stops': safety_stops,
             'coverage': coverage.fraction(),
             'total_by_type': total_by_type,
             'collected_by_type': dict(world.collected_by_type),
