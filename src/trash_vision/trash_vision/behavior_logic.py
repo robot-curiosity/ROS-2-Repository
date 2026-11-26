@@ -142,6 +142,11 @@ class BehaviorMachine:
         self._was_searching = False
         self._pose = None
 
+    def set_param(self, name, value):
+        """Change one parameter while running (live tuning)."""
+        self.p[name] = value
+        self._search.set_param(name, value)
+
     @property
     def search(self):
         """The LawnmowerSearch (waypoints, laps, skipped) for logs/tests."""

@@ -137,7 +137,7 @@ def test_arm_services_cover_behavior_clients():
 
 
 def test_helper_scripts_print_help_without_ros():
-    for mod in ('trial_summary', 'hardware_check'):
+    for mod in ('trial_summary', 'hardware_check', 'dashboard'):
         r = subprocess.run(
             [sys.executable, '-m', 'trash_vision.' + mod, '--help'],
             cwd=PKG, capture_output=True, text=True, timeout=60)
