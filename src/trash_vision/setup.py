@@ -44,6 +44,7 @@ setup(
             'calibrate_camera = trash_vision.calibrate:main_camera',
             'trial_summary = trash_vision.trial_summary:main',
             'sonar_test = trash_vision.calibrate:main_sonar',
+            'bench = trash_vision.bench:run',
         ],
     },
 )
