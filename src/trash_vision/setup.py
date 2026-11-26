@@ -46,6 +46,7 @@ setup(
             'sonar_test = trash_vision.calibrate:main_sonar',
             'bench = trash_vision.bench:run',
             'dashboard = trash_vision.dashboard:main',
+            'tune_wheels = trash_vision.tune_wheels:run',
         ],
     },
 )
