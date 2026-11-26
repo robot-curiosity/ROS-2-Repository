@@ -79,6 +79,14 @@ class LawnmowerSearch:
         self._blocked_since = None
         self._last_step = -math.inf
 
+    def set_param(self, name, value):
+        """Change a search parameter; new row spacing rebuilds the rows."""
+        if name not in DEFAULTS or self.p[name] == value:
+            return
+        self.p[name] = value
+        if name == 'search_row_spacing':
+            self.waypoints = []
+
     def spacing(self):
         """Return the row spacing in metres."""
         p = self.p

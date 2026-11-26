@@ -9,6 +9,7 @@ import time
 # ROS:
 from geometry_msgs.msg import Twist
 from nav_msgs.msg import Odometry
+from rcl_interfaces.msg import SetParametersResult
 import rclpy
 from rclpy.node import Node
 from sensor_msgs.msg import Range
@@ -20,6 +21,7 @@ from trash_vision import behavior_logic as bl
 from trash_vision import safety_logic as sfl
 from trash_vision import sonar_scheduler as ss
 from trash_vision import trial_log as tl
+from trash_vision import tuning_logic as tu
 from trash_vision import ultrasonic_logic as ul
 
 FRONT = ul.FRONT_NAMES
@@ -62,6 +64,7 @@ class BehaviorNode(Node):
 
         self._cmd_pub = self.create_publisher(Twist, 'cmd_vel', 10)
         self._state_pub = self.create_publisher(String, 'behavior/state', 10)
+        self._safety_pub = self.create_publisher(String, 'behavior/safety', 10)
         self.create_subscription(
             String, '/vision/target', self._on_target, 10)
         self.create_subscription(Odometry, 'odom', self._on_odom, 10)
@@ -76,10 +79,29 @@ class BehaviorNode(Node):
         self.create_timer(1.0 / max(rate, 0.1), self._tick)
         # Watchdog runs faster than the tick so a stalled tick is caught:
         self.create_timer(0.1, self._watchdog)
+        # Registered after the declarations so startup values are not checked:
+        self.add_on_set_parameters_callback(self._on_set_parameters)
         if not self.get_parameter('enabled').value:
             self.get_logger().warning(
                 "Behavior disabled (parameter 'enabled' false): robot will "
                 'not move. Set enabled:=true to start searching.')
+
+    # Live tuning: apply allowed changes to the running logic, refuse bad ones:
+    def _on_set_parameters(self, params):
+        changes = {p.name: p.value for p in params if p.name in tu.TUNABLES}
+        current = dict(self._machine.p)
+        current.update(self._safety.cfg)
+        errors = tu.validate_changes(changes, current)
+        if errors:
+            return SetParametersResult(
+                successful=False, reason='; '.join(errors))
+        for name, value in changes.items():
+            if name in self._safety.cfg:
+                self._safety.cfg[name] = value
+            else:
+                self._machine.set_param(name, value)
+            self.get_logger().info('%s set to %g' % (name, value))
+        return SetParametersResult(successful=True)
 
     # Pickup attempt log (JSON Lines, one file per run); '' disables it:
     def _make_recorder(self):
@@ -193,6 +215,7 @@ class BehaviorNode(Node):
     # Log a safety intervention once per change of reason:
     def _log_safety(self) -> None:
         reason = self._safety.reason
+        self._safety_pub.publish(String(data=reason))
         if reason != self._last_safety_reason:
             if reason and reason not in ('clamped', 'accel_limited'):
                 self.get_logger().warning('safety stop: %s' % reason)

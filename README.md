@@ -63,6 +63,7 @@ After editing `robot.yaml`, run `colcon build --packages-select trash_vision` an
   `bringup_arm`, `bringup_camera`, `bringup_imu_gps`, and `sim.launch.py`.
   Use `ros2 launch trash_vision <file>`.
 - `ros2 run trash_vision trial_summary`: pickup rate from trial logs; plan in `docs/TRIAL_PLAN.md`.
+- `ros2 run trash_vision dashboard`: live web page (sonars, wheels, state, detections, safety stops) on port 8080 of the Pi; read-only unless started with `--allow-write` (no password, trusted networks only).
 - `python3 tools/status.py`: hardware test progress and unset config values, from the repo only.
 - `docs/HARDWARE_TESTS.md`: tests to run on the robot and their results.
 - `tools/record_result.py`: `next` shows the next untested row; `pass <n> "note"` or
