@@ -15,6 +15,16 @@ let `hardware_check` catch duplicates.
 - A hand on the power switch / battery connector whenever motors or arm can move.
 - `behavior.enabled` stays `false` until step 9.
 
+## Bench test (any step, nodes stopped)
+
+`ros2 run trash_vision bench <sonar|drive|arm|camera|all>` opens the hardware directly from
+`robot.yaml`. Space bar = software E-stop (not a replacement for the power switch).
+
+- `drive --wheels-off`: asks before each side, runs it forward for 2 s at 20 % duty (Pi GPIO backend only).
+- `arm`: number picks a joint, `+`/`-` moves it 2 degrees, `q` ends. Hold the arm before it disconnects.
+- `sonar`: live distance per sensor, `q` ends.
+- `camera`: 5 frames as a text picture plus detections with `base_x`, `base_y`.
+
 ## 0. Power and fuse check
 
 - Wire: 12 V pack -> fuse -> switch -> motor drivers; Pi on its own regulated 5 V.

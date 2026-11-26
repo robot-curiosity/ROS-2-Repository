@@ -51,3 +51,4 @@
 - 2026-11-24: item 36 (review pass 4, wiring): 11 new tests in test_wiring.py; pytest 352 passed locally from src/trash_vision (ament linter tests ignored); flake8 not installed locally. Node renames need ROS, not run here.
 - 2026-11-24: item 37 (review summary): docs only (`docs/reviews/SUMMARY.md`, 3 hardware-test rows); no code changed, existing pytest unaffected.
 - 2026-11-25: item 38 (test-result helper): new tests in test_record_result.py; pytest 362 passed locally from src/trash_vision (ament linter tests ignored); flake8 clean on the new files; `record_result.py next` run on the real table. Not run on the Pi.
+- 2026-11-25: item 39 (bench CLI): new tests in test_bench.py; pytest 382 passed locally from src/trash_vision (ament linter tests ignored); flake8 clean on the two new modules (test file lacks docstrings); `bench all` run in a pseudo-terminal with no hardware libraries (reported FAIL/SKIP as expected). No hardware, camera or model run.
