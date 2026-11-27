@@ -1,0 +1,178 @@
+# ALL hardware values live in this one file. Fill them in as each part is
+# assembled, then run that subsystem's launch file (see docs/BRINGUP.md):
+#   ros2 launch trash_vision bringup_<drive|sonar|arm|camera|imu_gps>.launch.py
+# Marker for "not set yet": -1 (pin), 0 or 0.0 (number), "" (text). A node
+# with unset values idles and logs one warning naming the missing parameter.
+# Keys are the launch node names. TODO: Bryan to fill in every "unset" value.
+drive:
+  ros__parameters:
+    pwm_pins: [-1, -1]        # BCM pin numbers [left, right], MDD10A PWM input
+    dir_pins: [-1, -1]        # BCM pins [left, right], MDD10A DIR input
+    enc_a_pins: [-1, -1]      # BCM pins [left, right], encoder channel A
+    enc_b_pins: [-1, -1]      # BCM pins [left, right], encoder channel B
+    ticks_per_rev: 0.0        # encoder counts per WHEEL rev (after gearbox, x4); spin a wheel 10 turns by hand, divide
+    wheel_radius_m: 0.0       # metres; measure wheel diameter / 2 (CAD: 0.060, not measured)
+    track_width_m: 0.0        # metres between left and right wheel contact patches (CAD: 0.481, not measured)
+    max_wheel_speed_mps: 0.5  # m/s top wheel speed the controller will command
+    max_accel_mps2: 1.0       # m/s^2 acceleration limit
+    min_duty: 0.0             # 0..1 PWM duty needed to just start the wheel turning
+    kp: 0.5                   # speed PI controller proportional gain
+    ki: 1.0                   # speed PI controller integral gain
+    invert_left: false        # true if the left wheel spins backwards for +x
+    invert_right: false       # true if the right wheel spins backwards for +x
+    invert_enc_left: false    # true if odom x decreases when the left wheel rolls forward
+    invert_enc_right: false   # true if odom x decreases when the right wheel rolls forward
+    cmd_timeout_s: 0.5        # seconds without cmd_vel before motors stop
+    update_rate_hz: 50.0      # control loop rate
+    odom_frame: "odom"
+    base_frame: "base_link"
+# OPTION, not the default: wheel speed loop on a Raspberry Pi Pico instead of the
+# Pi drive node. Use it with `wheel_backend:=pico` (bringup.launch.py or
+# bringup_drive.launch.py); the `drive:` section above is then not used.
+pico_bridge:
+  ros__parameters:
+    serial_port: ""           # serial port of the Pico, e.g. /dev/ttyACM1 (ls /dev/ttyACM*). TODO: Bryan to fill in
+    serial_baud: 115200       # baud rate (USB serial ignores it)
+    pico_pins: [-1, -1, -1, -1, -1, -1, -1, -1]  # Pico GPIO numbers: pwm_left, pwm_right, dir_left, dir_right, enc_a_left, enc_b_left, enc_a_right, enc_b_right. TODO: Bryan to fill in
+    ticks_per_rev: 0.0        # encoder counts per WHEEL rev (after gearbox, x4); same measurement as drive.ticks_per_rev
+    wheel_radius_m: 0.0       # metres; wheel diameter / 2 (CAD: 0.060, not measured)
+    track_width_m: 0.0        # metres between left and right wheel contact patches (CAD: 0.481, not measured)
+    max_wheel_speed_mps: 0.5  # m/s top wheel speed
+    max_accel_mps2: 1.0       # m/s^2 acceleration limit
+    min_duty: 0.0             # 0..1 PWM duty needed to just start the wheel turning
+    kp: 0.5                   # speed PI controller proportional gain
+    ki: 1.0                   # speed PI controller integral gain
+    invert_left: false        # true if the left wheel spins backwards for +x
+    invert_right: false       # true if the right wheel spins backwards for +x
+    invert_enc_left: false    # true if odom x decreases when the left wheel rolls forward
+    invert_enc_right: false   # true if odom x decreases when the right wheel rolls forward
+    cmd_timeout_s: 0.5        # seconds without cmd_vel before the bridge commands zero speed
+    pico_cmd_timeout_s: 0.5   # seconds without a command line before the Pico itself stops the wheels (watchdog)
+    send_rate_hz: 20.0        # how often the bridge sends the velocity command to the Pico
+    link_timeout_s: 1.0       # seconds without any Pico data before a warning is logged
+    odom_frame: "odom"
+    base_frame: "base_link"
+ultrasonic:
+  ros__parameters:
+    # Order: front_1, front_2, rear_1, rear_2, left_1, left_2, right_1, right_2
+    trig_pins: [-1, -1, -1, -1, -1, -1, -1, -1]   # BCM pins, one per sensor in the order above
+    echo_pins: [-1, -1, -1, -1, -1, -1, -1, -1]   # BCM pins (5 V echo needs a divider first)
+    settle_gap_s: 0.06        # s between pings; sensors fire one at a time, round-robin (HC-SR04s hear each other)
+    echo_timeout_s: 0.025     # s max wait for an echo per sensor (4 m round trip is ~0.023 s)
+    median_window: 3          # readings in the median filter
+    frame_prefix: "ultrasonic_"
+arm:
+  ros__parameters:
+    port: ""                  # serial port of the SO101 follower, e.g. /dev/ttyACM0 (ls /dev/ttyACM*)
+    robot_id: "curiosity_follower"  # LeRobot calibration id
+    use_degrees: true         # joint units in degrees
+    joint_min: [-100.0, -100.0, -100.0, -100.0, -100.0, -100.0]  # lower limit per joint (calibrate)
+    joint_max: [100.0, 100.0, 100.0, 100.0, 100.0, 100.0]        # upper limit per joint (calibrate)
+    gripper_open: 50.0        # gripper value when open (calibrate)
+    gripper_closed: 0.0       # gripper value when closed (calibrate)
+    grasp_min_gap: 5.0        # gripper must stay open at least this much when holding a can
+    max_step: 3.0             # max joint change per step (degrees)
+    step_period_s: 0.05       # seconds per interpolation step
+    state_rate_hz: 10.0       # joint state publish rate
+    ik_enabled: false         # true = compute pick waypoints from /vision/target base_x/base_y with arm_kinematics (enable only after the ik_* values below are calibrated)
+    ik_mount_x: 0.115         # m, arm base ahead of base_link. TODO: Bryan to measure (0.115 is the experimental branch's drivebase, not this CAD)
+    ik_mount_y: 0.0           # m, arm base left of base_link. TODO: Bryan to measure
+    ik_mount_height: 0.2155   # m, arm base above ground (arm shelf top 215.5 mm from CAD per STATE.md, not measured)
+    ik_grasp_height: 0.03     # m, gripper tip height above ground when grasping a can. TODO: Bryan to tune
+    ik_clearance: 0.06        # m, pre-grasp/lift height above the grasp point
+    ik_zone_min_x: 0.35       # m, nearest accepted target ahead of base_link (pick zone from STATE.md)
+    ik_zone_max_x: 0.56       # m, farthest accepted target ahead of base_link (pick zone from STATE.md)
+    ik_zone_max_abs_y: 0.30   # m, max sideways offset accepted. TODO: Bryan to confirm
+    ik_approach_deg: [-90.0, -75.0, -60.0]  # last-link angles to try, steepest first (-90 = straight down)
+    ik_joint_sign: [1.0, 1.0, 1.0, 1.0]     # +1/-1 per pan, lift, elbow, wrist_flex: model direction vs LeRobot direction. TODO: Bryan to calibrate
+    ik_joint_offset: [0.0, 0.0, 0.0, 0.0]   # backend units added per pan, lift, elbow, wrist_flex. TODO: Bryan to calibrate
+    target_max_age_s: 1.5     # s, a target older than this is not used for a pick
+    pose_stow: [0.0, -90.0, 90.0, 60.0, 0.0, 0.0]        # placeholder pose, calibrate
+    pose_pre_grasp: [0.0, -30.0, 60.0, 30.0, 0.0, 50.0]  # placeholder pose, calibrate
+    pose_grasp: [0.0, 0.0, 45.0, 20.0, 0.0, 50.0]        # placeholder pose, calibrate
+    pose_lift: [0.0, -40.0, 60.0, 30.0, 0.0, 0.0]        # placeholder pose, calibrate
+    pose_deposit: [90.0, -30.0, 60.0, 30.0, 0.0, 50.0]   # placeholder pose, calibrate
+gps_imu:
+  ros__parameters:
+    gps_port: ""              # GPS serial port, e.g. /dev/ttyAMA0
+    gps_baud: 9600            # GPS baud rate
+    gps_frame: "gps_link"
+    imu_model: ""             # "bno055" is the only backend so far
+    imu_i2c_bus: 1            # I2C bus number (i2cdetect -y 1)
+    imu_i2c_addr: 40          # I2C address in decimal (BNO055 default 0x28 = 40)
+    imu_frame: "imu_link"
+    imu_rate_hz: 50.0         # IMU publish rate
+detector:
+  ros__parameters:
+    model_path: "/home/christopherg/best_ncnn_model"  # YOLOv8 NCNN model folder on the Pi
+    camera_source: "tcp://127.0.0.1:8888"             # camera stream URL or device
+    confidence: 0.40          # minimum YOLO confidence 0..1
+    process_rate_hz: 10.0     # max detector cycles per second (Hz); frames are always the newest, measured rate is on /vision/fps
+    deadband: 0.12            # normalized horizontal error treated as centred
+    mapping_upload_url: "http://192.168.0.102:5000/frame"  # map server upload URL
+    mapping_enabled: true     # upload frames to the map server
+    mapping_interval_seconds: 2.0   # seconds between map uploads
+    mapping_jpeg_quality: 80        # JPEG quality 1..100 for uploads
+    gpt_fallback_enabled: false   # cloud vision stays off until on-device pickup works
+    gpt_fallback_interval_seconds: 5.0  # seconds between cloud fallback calls
+    gpt_fallback_low_confidence: 0.30     # YOLO confidence below which fallback is tried
+    gpt_model: "gpt-4o"   # cloud model name (key read from OPENAI_API_KEY)
+    # Camera pose for ground projection: from CAD V16-18 per STATE.md, not
+    # measured. TODO: Bryan to verify on the real robot.
+    camera_x_m: 0.248         # metres forward of base_link
+    camera_y_m: -0.1575       # metres left of base_link
+    camera_height_m: 0.642    # metres above floor (0.582 above base_link + 0.060 wheel radius)
+    camera_pitch_deg: 35.0    # degrees the camera looks down
+    camera_hfov_deg: 66.0     # horizontal field of view in degrees
+    camera_vfov_deg: 41.0     # vertical FOV, Camera Module 3 guess, check stream crop
+    confirm_frames: 3         # a target must be seen in this many of the last confirm_window frames before it is reported
+    confirm_window: 5         # frames in the confirmation window
+    track_match_radius: 0.10  # normalized image distance within which a box counts as the same target between frames
+    ignore_regions: [0.0, 0.0, 0.0, 0.0]  # normalized x1,y1,x2,y2 groups (repeat for more) where own bag hoop/arm appears; zero-area = none. TODO: Bryan to measure from a camera frame
+behavior:
+  ros__parameters:
+    enabled: false            # true lets the robot move; leave false until drive is tested
+    rate_hz: 10.0             # state machine rate
+    trial_log_dir: "~/curiosity_trials"  # folder for pickup attempt logs (JSON Lines, one file per run); empty string turns logging off
+    search_turn_speed: 0.5    # rad/s spin while searching
+    approach_speed: 0.2       # m/s forward speed while approaching
+    max_turn_speed: 0.8       # rad/s turn limit
+    turn_gain: 2.0            # rad/s per unit of normalized horizontal error
+    min_confidence: 0.3       # ignore detections below this
+    pick_floor_y: 0.85        # normalized image y of a can within arm reach; calibrate (can at pick spot, read /vision/target)
+    pick_center_tolerance: 0.12  # normalized x tolerance to start a pick; calibrate
+    target_lost_timeout: 1.5  # seconds of no detection before giving up
+    stop_distance: 0.25       # metres; front sonar closer than this stops/avoids
+    slow_distance: 0.6        # metres; front sonar closer than this slows down
+    avoid_turn_speed: 0.6     # rad/s avoidance turn
+    recover_backup_speed: 0.1 # m/s reversing speed in RECOVER
+    recover_backup_time: 1.5  # seconds reversing in RECOVER
+    rear_stop_distance: 0.25  # metres; rear sonar closer than this blocks reversing
+    side_clearance: 0.20      # metres; side sonar closer than this blocks spinning toward it (working value, tune)
+    pick_failures_before_recover: 2   # failed picks before RECOVER
+    arm_timeout: 30.0         # seconds before an arm action counts as failed
+    approach_timeout: 30.0    # seconds before APPROACH gives up
+    approach_cooldown: 3.0    # seconds detections are ignored after an approach timeout
+    target_stale_timeout: 1.0 # seconds before a /vision/target message counts as stale
+    sonar_stale_timeout: 2.0  # seconds before a sonar that reported earlier counts as blocked (full 8-sensor round takes ~0.7 s)
+    # Search pattern (lawnmower rows driven by odometry; origin = robot start pose)
+    search_pattern: "lawnmower"   # "lawnmower" or "spin" (old behavior, no odometry)
+    search_area_length: 4.0   # metres along the start heading; TODO: Bryan, measure the test field
+    search_area_width: 4.0    # metres across the start heading; TODO: Bryan, measure the test field
+    search_edge_margin: 0.3   # metres kept clear of the area edge
+    search_row_spacing: 0.0   # metres between rows; 0 = derive from field of view and detect range
+    search_detect_range: 1.5  # metres at which a can is reliably detected; guess, check with the detector
+    search_row_overlap: 0.2   # fraction (0-0.9) neighbouring sweeps overlap
+    search_camera_hfov_deg: 66.0  # degrees; from CAD V16-18 per STATE.md, not measured
+    search_speed: 0.2         # m/s along a row
+    search_waypoint_tolerance: 0.15  # metres; waypoint counts as reached
+    search_stuck_timeout: 10.0  # seconds without progress before a waypoint is skipped
+    # Safety output stage (last filter before cmd_vel); working values, tune on the robot:
+    safety_max_linear: 0.4    # m/s hard speed clamp
+    safety_max_angular: 1.0   # rad/s hard turn clamp
+    safety_max_linear_accel: 0.5   # m/s^2 acceleration limit
+    safety_max_angular_accel: 2.0  # rad/s^2 angular acceleration limit
+    safety_hard_stop_distance: 0.12  # metres; front sonar below this forces zero velocity (keep below stop_distance)
+    safety_hard_stop_escape: true  # true: below hard stop only forward motion is cut, reverse/turn still allowed; false: everything zero
+    safety_behavior_timeout: 0.5  # seconds without a behavior update before zero velocity
+    safety_require_sonars: true   # true: stop if no sonar ever reported; false only for bring-up without sonars

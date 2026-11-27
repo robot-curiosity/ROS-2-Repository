@@ -1,3 +1,6 @@
+from glob import glob
+import os
+
 from setuptools import find_packages, setup
 
 package_name = 'trash_vision'
@@ -10,6 +13,8 @@ setup(
         ('share/ament_index/resource_index/packages',
             ['resource/' + package_name]),
         ('share/' + package_name, ['package.xml']),
+        (os.path.join('share', package_name, 'launch'), glob('launch/*.py')),
+        (os.path.join('share', package_name, 'config'), glob('config/*.yaml')),
     ],
     install_requires=['setuptools'],
     zip_safe=True,
@@ -24,7 +29,28 @@ setup(
     },
     entry_points={
         'console_scripts': [
-            "detector = trash_vision.detector_node:main",
+            'detector = trash_vision.detector_node:main',
+            'ultrasonic = trash_vision.ultrasonic_node:main',
+            'drive = trash_vision.drive_node:main',
+            'pico_bridge = trash_vision.pico_bridge_node:main',
+            'arm = trash_vision.arm_node:main',
+            'gps_imu = trash_vision.gps_imu_node:main',
+            'behavior = trash_vision.behavior_node:main',
+            'sim = trash_vision.sim_node:main',
+            'hardware_check = trash_vision.hardware_check:main',
+            'calibrate_encoders = trash_vision.calibrate:main_encoders',
+            'calibrate_drive = trash_vision.calibrate:main_drive',
+            'calibrate_pick_zone = trash_vision.calibrate:main_pick_zone',
+            'calibrate_camera = trash_vision.calibrate:main_camera',
+            'trial_summary = trash_vision.trial_summary:main',
+            'sonar_test = trash_vision.calibrate:main_sonar',
+            'bench = trash_vision.bench:run',
+            'dashboard = trash_vision.dashboard:main',
+            'tune_wheels = trash_vision.tune_wheels:run',
+            'record_trial = trash_vision.record_trial:run',
+            'analyze_run = trash_vision.analyze_run:run',
+            'replay_run = trash_vision.replay_run:run',
+            'sweep_sim = trash_vision.sweep_sim:run',
         ],
     },
 )
