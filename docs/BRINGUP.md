@@ -36,7 +36,7 @@ let `hardware_check` catch duplicates.
 
 - Wire: 8 HC-SR04, trig and echo each to a GPIO. Echo is 5 V: use a divider or level shifter on every echo pin (Pi pins are 3.3 V only). Sensor order: front_1, front_2, rear_1, rear_2, left_1, left_2, right_1, right_2.
 - Fill in: `ultrasonic.trig_pins`, `ultrasonic.echo_pins` (-1 = not fitted).
-- Run: `ros2 run trash_vision hardware_check sonar`, then `ros2 run trash_vision sonar_test`, then `ros2 launch trash_vision bringup_sonar.launch.py`.
+- Run: `ros2 run trash_vision hardware_check sonar`, then `ros2 launch trash_vision bringup_sonar.launch.py` and, in a second terminal, `ros2 run trash_vision sonar_test` (it reads the node's topics).
 - PASS: `[PASS] sonar`; `sonar_test` shows each named sensor changing when you put a hand in front of it, none stuck or swapped.
 - Common failure: no echo or stuck at max range (divider wrong, trig/echo swapped), or two sensors swapped in the list.
 

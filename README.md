@@ -54,6 +54,7 @@ After editing `robot.yaml`, run `colcon build --packages-select trash_vision` an
 
 ## Where to find things
 
+- `docs/QUICKSTART.md`: one page with the command for every task.
 - `docs/BRINGUP.md`: the order to bring the robot up, step by step. Start here.
 - `src/trash_vision/config/robot.yaml`: the only file with hardware values (pins, ports, dimensions).
 - Calibration tools (each prints a line to paste into `robot.yaml`):
